@@ -1,11 +1,12 @@
 import { RASTER_COLUMNS, RASTER_ROWS } from '~/utils/incidentOptions'
 
-/** Grid area on raster-map.png as fractions of image width/height. */
+/** Grid area on raster-map.png (4096×3508) as fractions of image width/height. */
 export const RASTER_MAP_GRID_BOUNDS = {
-  left: 0.058,
-  top: 0.048,
-  right: 0.968,
-  bottom: 0.902,
+  // Calibrated from corners: A1 (180,313), A22 (3751,313), M1 (180,2873), M22 (3751,2873)
+  left: 180 / 4096,
+  top: 313 / 3508,
+  right: 3751 / 4096,
+  bottom: 2873 / 3508,
 } as const
 
 export interface RasterMapCell {
