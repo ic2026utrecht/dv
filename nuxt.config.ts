@@ -30,6 +30,8 @@ export default defineNuxtConfig({
   modules: ['@nuxtjs/tailwindcss', '@primevue/nuxt-module', '@pinia/nuxt'],
   runtimeConfig: {
     public: {
+      supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL ?? '',
+      supabaseAnonKey: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
       sheetsApiUrl: process.env.NUXT_PUBLIC_SHEETS_API_URL ?? '',
     },
   },

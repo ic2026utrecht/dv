@@ -1,0 +1,8 @@
+# IC2026 DV — Supabase project ic2026dv-cr
+project_id = "msvyekticsjjqdaadult"
+
+[api]
+enabled = true
+
+[db]
+major_version = 17

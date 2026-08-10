@@ -1,28 +1,48 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ConfigResponse, SubmitIncidentResponse, IncidentsResponse, UpdateIncidentResponse } from '~/types/api'
 import type { IncidentSubmission, IncidentUpdate } from '~/types/models'
-import { fetchSheetsConfig, postSheetsIncident, fetchSheetsIncidents, postSheetsIncidentUpdate } from '~/utils/sheetsApi'
+import {
+  assertSupabaseConfig,
+  fetchSupabaseConfig,
+  fetchSupabaseIncidents,
+  postSupabaseIncident,
+  postSupabaseIncidentUpdate,
+} from '~/utils/supabaseApi'
 
 class IncidentsModule {
-  private baseURL: string
+  private client: SupabaseClient
+  private supabaseUrl: string
+  private supabaseAnonKey: string
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL
+  constructor(client: SupabaseClient, supabaseUrl: string, supabaseAnonKey: string) {
+    this.client = client
+    this.supabaseUrl = supabaseUrl
+    this.supabaseAnonKey = supabaseAnonKey
+  }
+
+  private assertConfigured(): void {
+    assertSupabaseConfig(this.supabaseUrl, this.supabaseAnonKey)
   }
 
   async getConfig(): Promise<ConfigResponse> {
-    return await fetchSheetsConfig(this.baseURL)
+    this.assertConfigured()
+    return await fetchSupabaseConfig(this.client)
   }
 
   async submit(payload: IncidentSubmission): Promise<SubmitIncidentResponse> {
-    return await postSheetsIncident(this.baseURL, payload)
+    this.assertConfigured()
+    const config = await fetchSupabaseConfig(this.client)
+    return await postSupabaseIncident(this.client, payload, config.data.helpOptions)
   }
 
   async list(): Promise<IncidentsResponse> {
-    return await fetchSheetsIncidents(this.baseURL)
+    this.assertConfigured()
+    return await fetchSupabaseIncidents(this.client)
   }
 
   async update(payload: IncidentUpdate): Promise<UpdateIncidentResponse> {
-    return await postSheetsIncidentUpdate(this.baseURL, payload)
+    this.assertConfigured()
+    return await postSupabaseIncidentUpdate(this.client, payload)
   }
 }
 

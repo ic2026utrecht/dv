@@ -34,7 +34,8 @@ jobs:
         run: pnpm run generate
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          NUXT_PUBLIC_SHEETS_API_URL: ${{ vars.NUXT_PUBLIC_SHEETS_API_URL }}
+          NUXT_PUBLIC_SUPABASE_URL: ${{ vars.NUXT_PUBLIC_SUPABASE_URL }}
+          NUXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NUXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

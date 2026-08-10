@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /**
- * Seed test incidents via the deployed Apps Script Web App (same path as the Nuxt form).
+ * Seed test incidents via Supabase (same payloads as the web form).
  *
  * Usage:
  *   pnpm seed:test-data              # insert default sample incidents
  *   pnpm seed:test-data -- --dry-run # print payloads without posting
  *   pnpm seed:test-data -- --count 3 # insert first N samples
  *
- * Requires NUXT_PUBLIC_SHEETS_API_URL in .env (copy from .env.example).
+ * Requires NUXT_PUBLIC_SUPABASE_URL and NUXT_PUBLIC_SUPABASE_ANON_KEY in .env.
  */
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createClient } from '@supabase/supabase-js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -29,8 +30,8 @@ function loadEnv() {
       const key = trimmed.slice(0, eq).trim()
       let value = trimmed.slice(eq + 1).trim()
       if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
+        (value.startsWith('"') && value.endsWith('"'))
+        || (value.startsWith("'") && value.endsWith("'"))
       ) {
         value = value.slice(1, -1)
       }
@@ -52,42 +53,78 @@ function parseArgs(argv) {
   return opts
 }
 
-function assertApiUrl(url) {
-  if (!url || url.includes('YOUR_DEPLOYMENT_ID')) {
-    throw new Error(
-      'Set NUXT_PUBLIC_SHEETS_API_URL in .env to your deployed /exec URL (see .env.example).',
+function assertSupabaseEnv() {
+  const url = process.env.NUXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url) {
+    throw new Error('Set NUXT_PUBLIC_SUPABASE_URL in .env (see .env.example).')
+  }
+  if (!key || key.includes('YOUR_')) {
+    throw new Error('Set NUXT_PUBLIC_SUPABASE_ANON_KEY in .env (see .env.example).')
+  }
+  return { url, key }
+}
+
+async function fetchConfig(supabase) {
+  const [locationsRes, typesRes, helpRes] = await Promise.all([
+    supabase.from('locations').select('*').eq('active', true).order('name'),
+    supabase.from('incident_types').select('*').eq('active', true).order('name'),
+    supabase.from('help_options').select('*').eq('active', true).order('name'),
+  ])
+
+  if (locationsRes.error) throw new Error(locationsRes.error.message)
+  if (typesRes.error) throw new Error(typesRes.error.message)
+  if (helpRes.error) throw new Error(helpRes.error.message)
+
+  if (!locationsRes.data?.length) {
+    throw new Error('No locations in Supabase — run migrate-from-sheets or seed dimensions first.')
+  }
+
+  return {
+    locations: locationsRes.data,
+    incidentTypes: typesRes.data ?? [],
+    helpOptions: helpRes.data ?? [],
+  }
+}
+
+async function postIncident(supabase, payload, helpOptions) {
+  let helpOptionIds = [...(payload.helpOptionIds ?? [])]
+  if (payload.ambulanceCalled === true) {
+    const help112 = helpOptions.find(
+      opt => String(opt.name).trim().toLowerCase() === '112 gebeld',
     )
+    if (help112 && !helpOptionIds.includes(help112.id)) {
+      helpOptionIds.push(help112.id)
+    }
   }
-}
 
-async function fetchConfig(apiUrl) {
-  const res = await fetch(`${apiUrl}?action=config`, { redirect: 'follow' })
-  if (!res.ok) throw new Error(`Config request failed: HTTP ${res.status}`)
-  const json = await res.json()
-  if (json.error) throw new Error(json.error)
-  if (!json.data?.locations?.length) {
-    throw new Error('Config returned no locations — run setupCleanWorkbook() in Apps Script first.')
+  let description = payload.description.trim()
+  if (payload.personsInvolved) {
+    description += ` [betrokkenen: ${payload.personsInvolved}]`
   }
-  return json.data
-}
 
-async function postIncident(apiUrl, payload) {
-  const res = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    redirect: 'follow',
-  })
-  const text = await res.text()
-  let json
-  try {
-    json = JSON.parse(text)
-  } catch {
-    throw new Error(`Invalid JSON response (HTTP ${res.status}): ${text.slice(0, 200)}`)
-  }
-  if (json.error) throw new Error(json.error)
-  if (!json.data?.incidentId) throw new Error('Missing incidentId in response')
-  return json.data
+  const { data, error } = await supabase
+    .from('incidents')
+    .insert({
+      department: payload.department,
+      location_id: payload.locationId,
+      sector_row: payload.sectorRow,
+      sector_column: payload.sectorColumn,
+      sector_label: '',
+      incident_type_id: payload.incidentTypeId,
+      description,
+      help_option_ids: helpOptionIds.join(','),
+      priority: payload.priority,
+      reporter: payload.reporter.trim(),
+      status: 'Open',
+      source_row: 'webapp',
+    })
+    .select('incident_id, timestamp')
+    .single()
+
+  if (error) throw new Error(error.message)
+  if (!data?.incident_id) throw new Error('Missing incident_id in response')
+  return data
 }
 
 function firstOf(list, predicate) {
@@ -96,20 +133,20 @@ function firstOf(list, predicate) {
 
 function helpForDepartment(helpOptions, department, count = 1) {
   return helpOptions
-    .filter((h) => h.departments.includes(department))
+    .filter(h => (h.departments ?? []).includes(department))
     .slice(0, count)
-    .map((h) => h.id)
+    .map(h => h.id)
 }
 
 function buildSamples(config) {
   const { locations, incidentTypes, helpOptions } = config
 
-  const loc = (id) => firstOf(locations, (l) => l.id === id) ?? locations[0]
+  const loc = (id) => firstOf(locations, l => l.id === id) ?? locations[0]
   const type = (dept, namePart) =>
     firstOf(
       incidentTypes,
-      (t) => t.department === dept && t.name.toLowerCase().includes(namePart.toLowerCase()),
-    ) ?? firstOf(incidentTypes, (t) => t.department === dept)
+      t => t.department === dept && t.name.toLowerCase().includes(namePart.toLowerCase()),
+    ) ?? firstOf(incidentTypes, t => t.department === dept)
 
   const parkeerHelp = helpForDepartment(helpOptions, 'Parkeer', 2)
   const dienstHelp = helpForDepartment(helpOptions, 'Dienstverlening', 1)
@@ -192,7 +229,7 @@ function buildSamples(config) {
 function printHelp() {
   console.log(`Usage: pnpm seed:test-data [-- --dry-run] [-- --count N]
 
-Seeds sample incidents through the same Apps Script API as the web app.
+Seeds sample incidents through Supabase (same shape as the web app).
 Each row is prefixed with [TEST] in the description for easy filtering.`)
 }
 
@@ -204,11 +241,13 @@ async function main() {
     return
   }
 
-  const apiUrl = process.env.NUXT_PUBLIC_SHEETS_API_URL
-  assertApiUrl(apiUrl)
+  const { url, key } = assertSupabaseEnv()
+  const supabase = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
 
   console.log('Fetching config…')
-  const config = await fetchConfig(apiUrl)
+  const config = await fetchConfig(supabase)
   const samples = buildSamples(config).slice(0, opts.count)
 
   if (opts.dryRun) {
@@ -226,9 +265,9 @@ async function main() {
   for (const sample of samples) {
     process.stdout.write(`  ${sample.department} @ ${sample.locationId} … `)
     try {
-      const result = await postIncident(apiUrl, sample)
+      const result = await postIncident(supabase, sample, config.helpOptions)
       created.push(result)
-      console.log(result.incidentId)
+      console.log(result.incident_id)
     } catch (err) {
       console.log('FAILED')
       throw err
@@ -237,12 +276,12 @@ async function main() {
 
   console.log(`\nDone. Created ${created.length} incident(s):`)
   for (const row of created) {
-    console.log(`  ${row.incidentId}  ${row.timestamp}`)
+    console.log(`  ${row.incident_id}  ${row.timestamp}`)
   }
-  console.log('\nOpen the Sheet → Incidents_view or Sitrep tab to verify.')
+  console.log('\nOpen /sitrep in the app to verify.')
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error('\nSeed failed:', err.message || err)
   process.exit(1)
 })
