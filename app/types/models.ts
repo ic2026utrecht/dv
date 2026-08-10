@@ -53,6 +53,8 @@ export interface IncidentSubmission {
   description: string
   personsInvolved?: number
   ambulanceCalled?: boolean
+  latitude?: number
+  longitude?: number
 }
 
 export interface IncidentSubmissionResult {

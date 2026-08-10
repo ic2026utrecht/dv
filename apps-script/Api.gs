@@ -128,6 +128,7 @@ function createIncidentFromWebApp_(body) {
   }
 
   var incidents = ss.getSheetByName(CONFIG.INCIDENTS_SHEET);
+  ensureIncidentGeoColumns_(ss);
   var incidentId = nextIncidentId_(incidents);
 
   var row = [
@@ -146,7 +147,9 @@ function createIncidentFromWebApp_(body) {
     true,
     '',
     priorityToRank_(body.priority),
-    'webapp'
+    'webapp',
+    formatCoord_(body.latitude),
+    formatCoord_(body.longitude)
   ];
 
   incidents.appendRow(row);
@@ -182,6 +185,22 @@ function validateSubmission_(body) {
       throw new Error('112 gebeld? verplicht voor EHBO');
     }
   }
+  validateOptionalCoord_(body.latitude, -90, 90, 'latitude');
+  validateOptionalCoord_(body.longitude, -180, 180, 'longitude');
+}
+
+function validateOptionalCoord_(value, min, max, label) {
+  if (value === undefined || value === null || value === '') return;
+  var n = Number(value);
+  if (isNaN(n) || n < min || n > max) {
+    throw new Error('Ongeldige ' + label);
+  }
+}
+
+function formatCoord_(value) {
+  if (value === undefined || value === null || value === '') return '';
+  var n = Number(value);
+  return isNaN(n) ? '' : n;
 }
 
 function readLocations_(ss) {
@@ -290,6 +309,7 @@ function ensureWorkbookSheets_(ss) {
   if (!ss.getSheetByName(CONFIG.REFERENCE_SHEET)) buildReferenceSheet_(ss);
   if (!ss.getSheetByName(API_CONFIG.LOCATIONS_SHEET)) buildLocationsSheet_(ss);
   if (!ss.getSheetByName(CONFIG.INCIDENTS_SHEET)) buildIncidentsSheet_(ss);
+  ensureIncidentGeoColumns_(ss);
 }
 
 function applySingleIncidentFormulas_(sheet, row) {

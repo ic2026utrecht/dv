@@ -14,11 +14,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   let panOriginY = 0
   let isPanning = false
   let activePointerId: number | null = null
-  let touchMoved = false
-
-  function isCellTarget(target: EventTarget | null) {
-    return target instanceof Element && Boolean(target.closest('.ic-raster-cell'))
-  }
+  let gestureMoved = false
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value))
@@ -30,7 +26,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
     translateY.value = 0
     isPanning = false
     activePointerId = null
-    touchMoved = false
+    gestureMoved = false
   }
 
   function normalizeScale() {
@@ -42,6 +38,14 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
     }
   }
 
+  function markMoved(clientX: number, clientY: number) {
+    const dx = clientX - panStartX
+    const dy = clientY - panStartY
+    if (Math.hypot(dx, dy) > 6) {
+      gestureMoved = true
+    }
+  }
+
   function getTouchDistance(touches: TouchList) {
     const dx = touches[0]!.clientX - touches[1]!.clientX
     const dy = touches[0]!.clientY - touches[1]!.clientY
@@ -49,7 +53,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   }
 
   function onTouchStart(event: TouchEvent) {
-    touchMoved = false
+    gestureMoved = false
 
     if (event.touches.length === 2) {
       isPanning = false
@@ -58,43 +62,45 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
       return
     }
 
-    if (isCellTarget(event.target)) {
-      return
-    }
-
-    if (event.touches.length === 1 && scale.value > minScale) {
-      isPanning = true
+    if (event.touches.length === 1) {
       panStartX = event.touches[0]!.clientX
       panStartY = event.touches[0]!.clientY
-      panOriginX = translateX.value
-      panOriginY = translateY.value
+
+      if (scale.value > minScale) {
+        isPanning = true
+        panOriginX = translateX.value
+        panOriginY = translateY.value
+      }
     }
   }
 
   function onTouchMove(event: TouchEvent) {
     if (event.touches.length === 2) {
       event.preventDefault()
-      touchMoved = true
+      gestureMoved = true
       const distance = getTouchDistance(event.touches)
       scale.value = clamp(pinchStartScale * (distance / pinchStartDistance), minScale, maxScale)
       return
     }
 
-    if (event.touches.length === 1 && isPanning) {
-      event.preventDefault()
-      const dx = event.touches[0]!.clientX - panStartX
-      const dy = event.touches[0]!.clientY - panStartY
-      if (Math.hypot(dx, dy) > 6) {
-        touchMoved = true
+    if (event.touches.length === 1) {
+      const touch = event.touches[0]!
+      markMoved(touch.clientX, touch.clientY)
+
+      if (isPanning) {
+        event.preventDefault()
+        translateX.value = panOriginX + (touch.clientX - panStartX)
+        translateY.value = panOriginY + (touch.clientY - panStartY)
       }
-      translateX.value = panOriginX + dx
-      translateY.value = panOriginY + dy
     }
   }
 
-  function onTouchEnd() {
+  function onTouchEnd(): boolean {
+    const isTap = !gestureMoved
     isPanning = false
     normalizeScale()
+    gestureMoved = false
+    return isTap
   }
 
   function onWheel(event: WheelEvent) {
@@ -105,25 +111,31 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   }
 
   function onPointerDown(event: PointerEvent) {
-    if (event.pointerType === 'touch' || isCellTarget(event.target)) {
+    if (event.pointerType === 'touch') {
       return
     }
 
-    if (scale.value <= minScale) {
-      return
-    }
-
-    isPanning = true
-    activePointerId = event.pointerId
+    gestureMoved = false
     panStartX = event.clientX
     panStartY = event.clientY
-    panOriginX = translateX.value
-    panOriginY = translateY.value
-    event.currentTarget?.setPointerCapture?.(event.pointerId)
+    activePointerId = event.pointerId
+
+    if (scale.value > minScale) {
+      isPanning = true
+      panOriginX = translateX.value
+      panOriginY = translateY.value
+      event.currentTarget?.setPointerCapture?.(event.pointerId)
+    }
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (!isPanning || event.pointerId !== activePointerId) {
+    if (event.pointerId !== activePointerId) {
+      return
+    }
+
+    markMoved(event.clientX, event.clientY)
+
+    if (!isPanning) {
       return
     }
 
@@ -131,14 +143,17 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
     translateY.value = panOriginY + (event.clientY - panStartY)
   }
 
-  function onPointerUp(event: PointerEvent) {
+  function onPointerUp(event: PointerEvent): boolean {
     if (event.pointerId !== activePointerId) {
-      return
+      return false
     }
 
+    const isTap = !gestureMoved
     isPanning = false
     activePointerId = null
+    gestureMoved = false
     normalizeScale()
+    return isTap
   }
 
   const transformStyle = computed(() => ({

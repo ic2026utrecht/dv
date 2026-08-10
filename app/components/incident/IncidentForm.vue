@@ -27,6 +27,7 @@ const ambulanceCalled = ref<'ja' | 'nee' | null>(null)
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
 const rasterMapOpen = ref(false)
+const { getCurrentPosition } = useGeolocation()
 
 onMounted(async () => {
   try {
@@ -111,6 +112,8 @@ async function onSubmit() {
   submitError.value = null
 
   try {
+    const coords = await getCurrentPosition()
+
     const result = await submitIncident({
       department: department.value,
       locationId: locationId.value,
@@ -123,6 +126,9 @@ async function onSubmit() {
       description: description.value.trim(),
       personsInvolved: isEhbo.value ? Number(personsInvolved.value) : undefined,
       ambulanceCalled: isEhbo.value ? ambulanceCalled.value === 'ja' : undefined,
+      ...(coords
+        ? { latitude: coords.latitude, longitude: coords.longitude }
+        : {}),
     })
     persistReporterContact()
     emit('submitted', result.incidentId)

@@ -41,7 +41,9 @@ var INCIDENT_HEADERS = [
   'is_open',
   'age_minutes',
   'priority_rank',
-  'source_row'
+  'source_row',
+  'latitude',
+  'longitude'
 ];
 
 /**
@@ -172,7 +174,9 @@ function syncIncidentsFromResponses() {
       isOpen,
       ageMinutes,
       priorityRank,
-      sourceRow
+      sourceRow,
+      '',
+      ''
     ]);
   }
 
@@ -365,6 +369,20 @@ function pad3_(n) {
   var s = String(n);
   while (s.length < 3) s = '0' + s;
   return s;
+}
+
+/** Adds new Incidents columns (e.g. latitude/longitude) without wiping existing data. */
+function ensureIncidentGeoColumns_(ss) {
+  var sheet = ss.getSheetByName(CONFIG.INCIDENTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 1) return;
+
+  var headerCount = sheet.getLastColumn();
+  var expected = INCIDENT_HEADERS.length;
+  if (headerCount >= expected) return;
+
+  var newHeaders = INCIDENT_HEADERS.slice(headerCount);
+  sheet.getRange(1, headerCount + 1, 1, headerCount + newHeaders.length)
+    .setValues([newHeaders]);
 }
 
 function loadIncidentsBySourceRow_(sheet) {

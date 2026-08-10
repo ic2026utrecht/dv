@@ -52,3 +52,41 @@ export function buildRasterMapCells(
 
   return cells
 }
+
+/** Map a screen tap to a sector code using the transformed stage element bounds. */
+export function pickSectorAtClientPoint(
+  clientX: number,
+  clientY: number,
+  stageElement: HTMLElement,
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+  bounds = RASTER_MAP_GRID_BOUNDS,
+): string | null {
+  const rect = stageElement.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null
+  }
+
+  const fx = (clientX - rect.left) / rect.width
+  const fy = (clientY - rect.top) / rect.height
+
+  if (fx < bounds.left || fx > bounds.right || fy < bounds.top || fy > bounds.bottom) {
+    return null
+  }
+
+  const gridWidth = bounds.right - bounds.left
+  const gridHeight = bounds.bottom - bounds.top
+  const colIndex = Math.floor(((fx - bounds.left) / gridWidth) * columns.length)
+  const rowIndex = Math.floor(((fy - bounds.top) / gridHeight) * rows.length)
+
+  if (
+    colIndex < 0
+    || colIndex >= columns.length
+    || rowIndex < 0
+    || rowIndex >= rows.length
+  ) {
+    return null
+  }
+
+  return `${rows[rowIndex]}${columns[colIndex]}`
+}

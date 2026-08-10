@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import rasterMap from '~/assets/images/raster-map.png'
-import { buildRasterMapCells } from '~/constants/rasterMapGrid'
+import { buildRasterMapCells, pickSectorAtClientPoint } from '~/constants/rasterMapGrid'
 
 const visible = defineModel<boolean>({ default: false })
 
@@ -13,6 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const cells = buildRasterMapCells()
+const stageRef = ref<HTMLElement | null>(null)
 
 const {
   transformStyle,
@@ -39,6 +40,32 @@ function close() {
 function onCellSelect(code: string) {
   emit('select', code)
   close()
+}
+
+function trySelectAt(clientX: number, clientY: number) {
+  if (!stageRef.value) {
+    return
+  }
+
+  const code = pickSectorAtClientPoint(clientX, clientY, stageRef.value)
+  if (code) {
+    onCellSelect(code)
+  }
+}
+
+function handleTouchEnd(event: TouchEvent) {
+  const isTap = onTouchEnd()
+  const touch = event.changedTouches[0]
+  if (isTap && touch) {
+    trySelectAt(touch.clientX, touch.clientY)
+  }
+}
+
+function handlePointerUp(event: PointerEvent) {
+  const isTap = onPointerUp(event)
+  if (isTap && event.pointerType === 'mouse') {
+    trySelectAt(event.clientX, event.clientY)
+  }
 }
 </script>
 
@@ -77,15 +104,15 @@ function onCellSelect(code: string) {
       class="ic-raster-dialog__viewport"
       @touchstart.passive="onTouchStart"
       @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
-      @touchcancel="onTouchEnd"
+      @touchend="handleTouchEnd"
+      @touchcancel="handleTouchEnd"
       @wheel="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
+      @pointerup="handlePointerUp"
+      @pointercancel="handlePointerUp"
     >
-      <div class="ic-raster-dialog__stage" :style="transformStyle">
+      <div ref="stageRef" class="ic-raster-dialog__stage" :style="transformStyle">
         <img
           :src="rasterMap"
           alt=""
@@ -94,16 +121,12 @@ function onCellSelect(code: string) {
           draggable="false"
         >
         <div class="ic-raster-dialog__grid" aria-hidden="true">
-          <button
+          <div
             v-for="cell in cells"
             :key="cell.code"
-            type="button"
             class="ic-raster-cell"
             :class="{ 'ic-raster-cell--selected': selectedSector === cell.code }"
             :style="cell.style"
-            :aria-label="`Sector ${cell.code}`"
-            :title="cell.code"
-            @click.stop="onCellSelect(cell.code)"
           />
         </div>
       </div>
@@ -215,26 +238,14 @@ function onCellSelect(code: string) {
 
 .ic-raster-cell {
   position: absolute;
-  margin: 0;
-  padding: 0;
   border: 1px solid rgb(45 46 126 / 0.08);
   background: rgb(135 161 198 / 0.04);
-  pointer-events: auto;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.12s, border-color 0.12s;
-}
-
-.ic-raster-cell:hover,
-.ic-raster-cell:focus-visible {
-  background: rgb(45 46 126 / 0.18);
-  border-color: rgb(45 46 126 / 0.45);
-  outline: none;
+  pointer-events: none;
 }
 
 .ic-raster-cell--selected {
-  background: rgb(230 151 50 / 0.38) !important;
-  border-color: var(--ic-orange) !important;
+  background: rgb(230 151 50 / 0.38);
+  border-color: var(--ic-orange);
   box-shadow: inset 0 0 0 1px rgb(230 151 50 / 0.55);
 }
 </style>
