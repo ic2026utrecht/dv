@@ -32,7 +32,14 @@ var INCIDENT_HEADERS = [
   'priority_rank',
   'source_row',
   'latitude',
-  'longitude'
+  'longitude',
+  'free_field',
+  'scenario',
+  'flag_ehbo',
+  'flag_beveiliging',
+  'flag_hc_safety',
+  'flag_reiniging',
+  'flag_veiligheid'
 ];
 
 var INCIDENT_COL = {
@@ -60,7 +67,14 @@ var INCIDENT_COL = {
   priority_rank: 21,
   source_row: 22,
   latitude: 23,
-  longitude: 24
+  longitude: 24,
+  free_field: 25,
+  scenario: 26,
+  flag_ehbo: 27,
+  flag_beveiliging: 28,
+  flag_hc_safety: 29,
+  flag_reiniging: 30,
+  flag_veiligheid: 31
 };
 
 var INCIDENTS_VIEW_HEADERS = [
@@ -83,7 +97,23 @@ var INCIDENTS_VIEW_HEADERS = [
   'age_minutes',
   'source_row',
   'latitude',
-  'longitude'
+  'longitude',
+  'free_field',
+  'scenario',
+  'flag_ehbo',
+  'flag_beveiliging',
+  'flag_hc_safety',
+  'flag_reiniging',
+  'flag_veiligheid',
+  'last_update',
+  'update_notes',
+  'closed_by',
+  'closure_result',
+  'location_id',
+  'sector_row',
+  'sector_column',
+  'incident_type_id',
+  'help_option_ids'
 ];
 
 /**
@@ -249,8 +279,20 @@ function padIncidentHeaders_(sheet, headers) {
     return;
   }
   var missing = INCIDENT_HEADERS.slice(headers.length);
-  sheet.getRange(1, headers.length + 1, 1, headers.length + missing.length)
-    .setValues([missing]);
+  var startCol = headers.length + 1;
+  sheet.getRange(1, startCol, 1, missing.length).setValues([missing]);
+}
+
+/**
+ * Public entry point — visible in the Apps Script Run dropdown.
+ * Pads Incidents headers if needed, then rebuilds Incidents_view.
+ */
+function refreshIncidentsView() {
+  var ss = getSpreadsheet_();
+  ensureIncidentSchema_(ss);
+  refreshIncidentsView_(ss);
+  SpreadsheetApp.flush();
+  Logger.log('refreshIncidentsView complete');
 }
 
 function migrateIncidentsSheetToRelational_(ss) {
@@ -329,6 +371,13 @@ function migrateOldIncidentRow_(row, oldIdx, maps) {
   out[INCIDENT_COL.source_row] = oldIdx.source_row >= 0 ? row[oldIdx.source_row] : '';
   out[INCIDENT_COL.latitude] = oldIdx.latitude >= 0 ? row[oldIdx.latitude] : '';
   out[INCIDENT_COL.longitude] = oldIdx.longitude >= 0 ? row[oldIdx.longitude] : '';
+  out[INCIDENT_COL.free_field] = cellAt_(row, oldIdx.free_field);
+  out[INCIDENT_COL.scenario] = cellAt_(row, oldIdx.scenario);
+  out[INCIDENT_COL.flag_ehbo] = parseBoolCell_(cellAt_(row, oldIdx.flag_ehbo));
+  out[INCIDENT_COL.flag_beveiliging] = parseBoolCell_(cellAt_(row, oldIdx.flag_beveiliging));
+  out[INCIDENT_COL.flag_hc_safety] = parseBoolCell_(cellAt_(row, oldIdx.flag_hc_safety));
+  out[INCIDENT_COL.flag_reiniging] = parseBoolCell_(cellAt_(row, oldIdx.flag_reiniging));
+  out[INCIDENT_COL.flag_veiligheid] = parseBoolCell_(cellAt_(row, oldIdx.flag_veiligheid));
   return out;
 }
 
@@ -361,6 +410,13 @@ function indexHeaders_(headers) {
     update_notes: idx('update_notes'),
     closed_by: idx('closed_by'),
     closure_result: idx('closure_result'),
+    free_field: idx('free_field'),
+    scenario: idx('scenario'),
+    flag_ehbo: idx('flag_ehbo'),
+    flag_beveiliging: idx('flag_beveiliging'),
+    flag_hc_safety: idx('flag_hc_safety'),
+    flag_reiniging: idx('flag_reiniging'),
+    flag_veiligheid: idx('flag_veiligheid'),
     source_row: idx('source_row'),
     latitude: idx('latitude'),
     longitude: idx('longitude')
@@ -401,6 +457,13 @@ function buildIncidentRow_(fields) {
   row[INCIDENT_COL.source_row] = fields.sourceRow || '';
   row[INCIDENT_COL.latitude] = fields.latitude !== undefined ? fields.latitude : '';
   row[INCIDENT_COL.longitude] = fields.longitude !== undefined ? fields.longitude : '';
+  row[INCIDENT_COL.free_field] = fields.freeField || '';
+  row[INCIDENT_COL.scenario] = fields.scenario || '';
+  row[INCIDENT_COL.flag_ehbo] = fields.flagEhbo === true;
+  row[INCIDENT_COL.flag_beveiliging] = fields.flagBeveiliging === true;
+  row[INCIDENT_COL.flag_hc_safety] = fields.flagHcSafety === true;
+  row[INCIDENT_COL.flag_reiniging] = fields.flagReiniging === true;
+  row[INCIDENT_COL.flag_veiligheid] = fields.flagVeiligheid === true;
   return row;
 }
 
@@ -474,6 +537,17 @@ function mapById_(items) {
 
 function normalizeKey_(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function parseBoolCell_(value) {
+  if (value === true) {
+    return true;
+  }
+  if (value === false) {
+    return false;
+  }
+  var normalized = String(value || '').trim().toUpperCase();
+  return normalized === 'TRUE' || normalized === 'JA' || normalized === 'YES' || normalized === '1';
 }
 
 function cellAt_(row, idx) {
@@ -781,7 +855,23 @@ function refreshIncidentsView_(ss) {
       row[INCIDENT_COL.age_minutes],
       row[INCIDENT_COL.source_row],
       row[INCIDENT_COL.latitude],
-      row[INCIDENT_COL.longitude]
+      row[INCIDENT_COL.longitude],
+      row[INCIDENT_COL.free_field],
+      row[INCIDENT_COL.scenario],
+      row[INCIDENT_COL.flag_ehbo],
+      row[INCIDENT_COL.flag_beveiliging],
+      row[INCIDENT_COL.flag_hc_safety],
+      row[INCIDENT_COL.flag_reiniging],
+      row[INCIDENT_COL.flag_veiligheid],
+      row[INCIDENT_COL.last_update],
+      row[INCIDENT_COL.update_notes],
+      row[INCIDENT_COL.closed_by],
+      row[INCIDENT_COL.closure_result],
+      row[INCIDENT_COL.location_id],
+      row[INCIDENT_COL.sector_row],
+      row[INCIDENT_COL.sector_column],
+      row[INCIDENT_COL.incident_type_id],
+      row[INCIDENT_COL.help_option_ids]
     ];
   });
 

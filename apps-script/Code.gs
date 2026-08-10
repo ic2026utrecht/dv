@@ -146,6 +146,13 @@ function syncIncidentsFromResponses() {
       updateNotes: previous ? previous.update_notes : getCell_(row, col.update_notes),
       closedBy: previous ? previous.closed_by : getCell_(row, col.closed_by),
       closureResult: previous ? previous.closure_result : getCell_(row, col.closure_result),
+      freeField: getCell_(row, col.free_field),
+      scenario: getCell_(row, col.scenario),
+      flagEhbo: parseBoolCell_(getCell_(row, col.flag_ehbo)),
+      flagBeveiliging: parseBoolCell_(getCell_(row, col.flag_beveiliging)),
+      flagHcSafety: parseBoolCell_(getCell_(row, col.flag_hc_safety)),
+      flagReiniging: parseBoolCell_(getCell_(row, col.flag_reiniging)),
+      flagVeiligheid: parseBoolCell_(getCell_(row, col.flag_veiligheid)),
       sourceRow: sourceRow,
       latitude: '',
       longitude: ''
@@ -256,9 +263,26 @@ function mapRawColumns_(headers) {
     update_notes: findIndex(['omschrijving update', 'update_notes']),
     closed_by: findIndex(['afgesloten door', 'closed_by']),
     closure_result: findIndex(['afsluiting', 'closure']),
+    free_field: findIndex(['vrije veld']),
+    scenario: findIndex(['scenario']),
+    flag_ehbo: findExactHeaderIndex_(headers, 'EHBO'),
+    flag_beveiliging: findExactHeaderIndex_(headers, 'Beveiliging'),
+    flag_hc_safety: findIndex(['afd. hc safety', 'hc safety']),
+    flag_reiniging: findExactHeaderIndex_(headers, 'Reiniging'),
+    flag_veiligheid: findExactHeaderIndex_(headers, 'Veiligheid'),
     persons_involved: findIndex(['aantal betrokken']),
     ambulance_called: findIndex(['112 gebeld?'])
   };
+}
+
+function findExactHeaderIndex_(headers, name) {
+  var target = String(name || '').trim().toLowerCase();
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i] || '').trim().toLowerCase() === target) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 function firstNonEmptyFromCols_(row, idxs, fallbackIdx) {

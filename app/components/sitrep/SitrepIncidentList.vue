@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Incident, IncidentStatus } from '~/types/models'
+import type { Incident, IncidentUpdate } from '~/types/models'
 import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
 import type { SitrepSortKey } from '~/utils/sitrepFilters'
 import { getIncidentSeverity, severityDotClass, severityLabel, severityRowBtnClass } from '~/utils/sitrepColors'
@@ -14,22 +14,15 @@ const saveError = ref<string | null>(null)
 
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
 
-const departmentOptions = [
-  { value: 'all', label: 'Alle afdelingen' },
-  ...DEPARTMENTS.map(d => ({ value: d, label: d })),
-]
+const departmentOptions = DEPARTMENTS.map(d => ({ value: d, label: d }))
 
-const priorityOptions = [
-  { value: 'all', label: 'Alle prioriteiten' },
-  ...PRIORITIES.map(p => ({ value: p, label: p })),
-]
+const priorityOptions = PRIORITIES.map(p => ({ value: p, label: p }))
 
 const statusOptions = [
   { value: 'open', label: 'Alleen open' },
   { value: 'Open', label: 'Open' },
   { value: 'In behandeling', label: 'In behandeling' },
   { value: 'Afgesloten', label: 'Afgesloten' },
-  { value: 'all', label: 'Alle statussen' },
 ]
 
 const sortOptions: { value: SitrepSortKey, label: string }[] = [
@@ -67,12 +60,7 @@ function openIncident(incident: Incident) {
   editDialogOpen.value = true
 }
 
-async function handleSave(payload: {
-  incidentId: string
-  status: IncidentStatus
-  actionOwner: string
-  updateNotes: string
-}) {
+async function handleSave(payload: IncidentUpdate) {
   saving.value = true
   saveError.value = null
 
@@ -94,34 +82,40 @@ async function handleSave(payload: {
   <section class="ic-sitrep-list ic-sitrep-list--panel">
     <div class="ic-sitrep-list__controls">
       <IcFormField label="Afdeling" html-for="sitrep-filter-department">
-        <Select
+        <MultiSelect
           id="sitrep-filter-department"
           :model-value="filters.department"
           :options="departmentOptions"
           option-label="label"
           option-value="value"
+          placeholder="Alle afdelingen"
+          display="chip"
           class="ic-sitrep-list__filter"
           @update:model-value="setFilter('department', $event)"
         />
       </IcFormField>
       <IcFormField label="Prioriteit" html-for="sitrep-filter-priority">
-        <Select
+        <MultiSelect
           id="sitrep-filter-priority"
           :model-value="filters.priority"
           :options="priorityOptions"
           option-label="label"
           option-value="value"
+          placeholder="Alle prioriteiten"
+          display="chip"
           class="ic-sitrep-list__filter"
           @update:model-value="setFilter('priority', $event)"
         />
       </IcFormField>
       <IcFormField label="Status" html-for="sitrep-filter-status">
-        <Select
+        <MultiSelect
           id="sitrep-filter-status"
           :model-value="filters.status"
           :options="statusOptions"
           option-label="label"
           option-value="value"
+          placeholder="Alle statussen"
+          display="chip"
           class="ic-sitrep-list__filter"
           @update:model-value="setFilter('status', $event)"
         />

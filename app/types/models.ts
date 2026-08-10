@@ -37,18 +37,35 @@ export interface Incident {
   incidentId: string
   timestamp: string
   department: Department
+  locationId?: string
   locationName: string
   zone: string
+  sectorRow?: string
+  sectorColumn?: number | null
+  sectorLabel?: string
   sector: string
+  incidentTypeId?: string
   incidentTypeName: string
   description: string
+  helpOptionIds?: string[]
   helpDeployed: string
   priority: Priority
   priorityRank: number
   reporter: string
+  freeField?: string
+  flagEhbo?: boolean
+  flagBeveiliging?: boolean
+  flagHcSafety?: boolean
+  flagReiniging?: boolean
+  flagVeiligheid?: boolean
   status: IncidentStatus
   actionOwner: string
+  scenario?: string
   deadline: string
+  lastUpdate?: string
+  updateNotes?: string
+  closedBy?: string
+  closureResult?: string
   isOpen: boolean
   ageMinutes: number
   sourceRow: string
@@ -101,10 +118,31 @@ export interface IncidentSubmissionResult {
 export interface IncidentUpdate {
   incidentId: string
   status: IncidentStatus
+  timestamp?: string
+  department?: Department
+  locationId?: string
+  sectorRow?: string
+  sectorColumn?: number | null
+  sectorLabel?: string
+  incidentTypeId?: string
+  description?: string
+  helpOptionIds?: string[]
+  priority?: Priority
+  reporter?: string
+  freeField?: string
+  flagEhbo?: boolean
+  flagBeveiliging?: boolean
+  flagHcSafety?: boolean
+  flagReiniging?: boolean
+  flagVeiligheid?: boolean
   actionOwner?: string
+  scenario?: string
+  deadline?: string
   updateNotes?: string
   closedBy?: string
   closureResult?: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export interface IncidentUpdateResult {

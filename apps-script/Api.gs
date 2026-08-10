@@ -326,10 +326,63 @@ function updateIncidentFromWebApp_(body) {
   var ss = getSpreadsheet_();
   ensureWorkbookSheets_(ss);
   var sheet = ss.getSheetByName(configSheet_('INCIDENTS_SHEET', 'Incidents'));
+  ensureIncidentSchema_(ss);
   var rowNum = findIncidentRowById_(sheet, body.incidentId);
   if (!rowNum) {
     throw new Error('Incident niet gevonden: ' + body.incidentId);
   }
+
+  if (body.timestamp !== undefined && body.timestamp !== null && body.timestamp !== '') {
+    sheet.getRange(rowNum, INCIDENT_COL.timestamp + 1).setValue(parseApiInputDate_(body.timestamp));
+  }
+  if (body.department !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.department + 1).setValue(String(body.department || ''));
+  }
+  if (body.locationId !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.location_id + 1).setValue(String(body.locationId || ''));
+  }
+  if (body.sectorRow !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.sector_row + 1).setValue(String(body.sectorRow || ''));
+  }
+  if (body.sectorColumn !== undefined) {
+    var sectorColumn = body.sectorColumn;
+    sheet.getRange(rowNum, INCIDENT_COL.sector_column + 1).setValue(
+      sectorColumn !== '' && sectorColumn !== null ? Number(sectorColumn) : ''
+    );
+  }
+  if (body.sectorLabel !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.sector_label + 1).setValue(String(body.sectorLabel || ''));
+  }
+  if (body.incidentTypeId !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.incident_type_id + 1).setValue(String(body.incidentTypeId || ''));
+  }
+  if (body.description !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.description + 1).setValue(String(body.description || ''));
+  }
+  if (body.helpOptionIds !== undefined) {
+    var helpIds = body.helpOptionIds;
+    if (Array.isArray(helpIds)) {
+      helpIds = helpIds.join(',');
+    }
+    sheet.getRange(rowNum, INCIDENT_COL.help_option_ids + 1).setValue(String(helpIds || ''));
+  }
+  if (body.priority !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.priority + 1).setValue(normalizePriority_(body.priority));
+  }
+  if (body.reporter !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.reporter + 1).setValue(String(body.reporter || ''));
+  }
+  if (body.freeField !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.free_field + 1).setValue(String(body.freeField || ''));
+  }
+  if (body.scenario !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.scenario + 1).setValue(String(body.scenario || ''));
+  }
+  setOptionalBoolColumn_(sheet, rowNum, INCIDENT_COL.flag_ehbo, body.flagEhbo);
+  setOptionalBoolColumn_(sheet, rowNum, INCIDENT_COL.flag_beveiliging, body.flagBeveiliging);
+  setOptionalBoolColumn_(sheet, rowNum, INCIDENT_COL.flag_hc_safety, body.flagHcSafety);
+  setOptionalBoolColumn_(sheet, rowNum, INCIDENT_COL.flag_reiniging, body.flagReiniging);
+  setOptionalBoolColumn_(sheet, rowNum, INCIDENT_COL.flag_veiligheid, body.flagVeiligheid);
 
   sheet.getRange(rowNum, INCIDENT_COL.status + 1).setValue(status);
   sheet.getRange(rowNum, INCIDENT_COL.last_update + 1).setValue(new Date());
@@ -337,16 +390,25 @@ function updateIncidentFromWebApp_(body) {
   if (body.actionOwner !== undefined) {
     sheet.getRange(rowNum, INCIDENT_COL.action_owner + 1).setValue(String(body.actionOwner || ''));
   }
+  if (body.deadline !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.deadline + 1).setValue(
+      body.deadline ? parseApiInputDate_(body.deadline) : ''
+    );
+  }
   if (body.updateNotes !== undefined) {
     sheet.getRange(rowNum, INCIDENT_COL.update_notes + 1).setValue(String(body.updateNotes || ''));
   }
-  if (status === 'Afgesloten') {
-    if (body.closedBy) {
-      sheet.getRange(rowNum, INCIDENT_COL.closed_by + 1).setValue(String(body.closedBy));
-    }
-    if (body.closureResult) {
-      sheet.getRange(rowNum, INCIDENT_COL.closure_result + 1).setValue(String(body.closureResult));
-    }
+  if (body.closedBy !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.closed_by + 1).setValue(String(body.closedBy || ''));
+  }
+  if (body.closureResult !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.closure_result + 1).setValue(String(body.closureResult || ''));
+  }
+  if (body.latitude !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.latitude + 1).setValue(formatCoord_(body.latitude));
+  }
+  if (body.longitude !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.longitude + 1).setValue(formatCoord_(body.longitude));
   }
 
   applySingleIncidentFormulas_(sheet, rowNum);
@@ -357,6 +419,24 @@ function updateIncidentFromWebApp_(body) {
     status: status,
     updatedAt: new Date().toISOString()
   };
+}
+
+function setOptionalBoolColumn_(sheet, rowNum, colIndex, value) {
+  if (value === undefined) {
+    return;
+  }
+  sheet.getRange(rowNum, colIndex + 1).setValue(value === true);
+}
+
+function parseApiInputDate_(value) {
+  if (value instanceof Date) {
+    return value;
+  }
+  var parsed = new Date(String(value));
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  return String(value || '');
 }
 
 function findIncidentRowById_(sheet, incidentId) {
@@ -375,38 +455,88 @@ function findIncidentRowById_(sheet, incidentId) {
 
 function readIncidentsView_(ss) {
   refreshIncidentsView_(ss);
-  var view = ss.getSheetByName(configSheet_('INCIDENTS_VIEW_SHEET', 'Incidents_view'));
-  if (!view || view.getLastRow() < 2) {
+  var incidents = ss.getSheetByName(configSheet_('INCIDENTS_SHEET', 'Incidents'));
+  if (!incidents || incidents.getLastRow() < 2) {
     return [];
   }
 
-  var data = view.getRange(2, 1, view.getLastRow() - 1, INCIDENTS_VIEW_HEADERS.length).getValues();
+  ensureIncidentSchema_(ss);
+  var maps = buildLookupMaps_(ss);
+  var colCount = Math.max(incidents.getLastColumn(), INCIDENT_HEADERS.length);
+  var data = incidents.getRange(2, 1, incidents.getLastRow() - 1, colCount).getValues();
+
   return data.map(function (row) {
-    return {
-      incidentId: String(row[0] || ''),
-      timestamp: formatApiTimestamp_(row[1]),
-      department: String(row[2] || ''),
-      locationName: String(row[3] || ''),
-      zone: String(row[4] || ''),
-      sector: String(row[5] || ''),
-      incidentTypeName: String(row[6] || ''),
-      description: String(row[7] || ''),
-      helpDeployed: String(row[8] || ''),
-      priority: String(row[9] || ''),
-      priorityRank: Number(row[10]) || 4,
-      reporter: String(row[11] || ''),
-      status: String(row[12] || ''),
-      actionOwner: String(row[13] || ''),
-      deadline: formatApiTimestamp_(row[14]),
-      isOpen: row[15] === true || String(row[15]).toUpperCase() === 'TRUE',
-      ageMinutes: Number(row[16]) || 0,
-      sourceRow: String(row[17] || ''),
-      latitude: formatCoord_(row[18]) || null,
-      longitude: formatCoord_(row[19]) || null
-    };
+    return mapIncidentRowToApiObject_(row, maps);
   }).filter(function (item) {
     return item.incidentId;
   });
+}
+
+function mapIncidentRowToApiObject_(row, maps) {
+  var location = maps.locationNameById[row[INCIDENT_COL.location_id]] || {};
+  var type = maps.typeNameById[row[INCIDENT_COL.incident_type_id]] || {};
+  var locationName = location.name || String(row[INCIDENT_COL.location_id] || '');
+  if (String(locationName).indexOf('unmatched:') === 0) {
+    locationName = locationName.replace(/^unmatched:/, '').replace(/-/g, ' ');
+  }
+  var typeName = type.name || String(row[INCIDENT_COL.incident_type_id] || '');
+  if (String(typeName).indexOf('unmatched:') === 0) {
+    typeName = typeName.replace(/^unmatched:/, '').replace(/-/g, ' ');
+  }
+
+  var helpIdsRaw = String(row[INCIDENT_COL.help_option_ids] || '');
+  var helpOptionIds = helpIdsRaw
+    ? helpIdsRaw.split(',').map(function (part) { return part.trim(); }).filter(Boolean)
+    : [];
+
+  var sectorColumn = row[INCIDENT_COL.sector_column];
+  var parsedSectorColumn = sectorColumn !== '' && sectorColumn !== null && sectorColumn !== undefined
+    ? Number(sectorColumn)
+    : null;
+
+  return {
+    incidentId: String(row[INCIDENT_COL.incident_id] || ''),
+    timestamp: formatApiTimestamp_(row[INCIDENT_COL.timestamp]),
+    department: String(row[INCIDENT_COL.department] || ''),
+    locationId: String(row[INCIDENT_COL.location_id] || ''),
+    locationName: locationName,
+    zone: location.zone || '',
+    sectorRow: String(row[INCIDENT_COL.sector_row] || ''),
+    sectorColumn: parsedSectorColumn !== null && !isNaN(parsedSectorColumn) ? parsedSectorColumn : null,
+    sectorLabel: String(row[INCIDENT_COL.sector_label] || ''),
+    sector: formatSectorDisplay_(
+      row[INCIDENT_COL.sector_row],
+      row[INCIDENT_COL.sector_column],
+      row[INCIDENT_COL.sector_label]
+    ),
+    incidentTypeId: String(row[INCIDENT_COL.incident_type_id] || ''),
+    incidentTypeName: typeName,
+    description: String(row[INCIDENT_COL.description] || ''),
+    helpOptionIds: helpOptionIds,
+    helpDeployed: helpNamesFromIds_(row[INCIDENT_COL.help_option_ids], maps.helpNameById),
+    priority: String(row[INCIDENT_COL.priority] || ''),
+    priorityRank: Number(row[INCIDENT_COL.priority_rank]) || 4,
+    reporter: String(row[INCIDENT_COL.reporter] || ''),
+    freeField: String(row[INCIDENT_COL.free_field] || ''),
+    flagEhbo: parseBoolCell_(row[INCIDENT_COL.flag_ehbo]),
+    flagBeveiliging: parseBoolCell_(row[INCIDENT_COL.flag_beveiliging]),
+    flagHcSafety: parseBoolCell_(row[INCIDENT_COL.flag_hc_safety]),
+    flagReiniging: parseBoolCell_(row[INCIDENT_COL.flag_reiniging]),
+    flagVeiligheid: parseBoolCell_(row[INCIDENT_COL.flag_veiligheid]),
+    status: String(row[INCIDENT_COL.status] || ''),
+    actionOwner: String(row[INCIDENT_COL.action_owner] || ''),
+    scenario: String(row[INCIDENT_COL.scenario] || ''),
+    deadline: formatApiTimestamp_(row[INCIDENT_COL.deadline]),
+    lastUpdate: formatApiTimestamp_(row[INCIDENT_COL.last_update]),
+    updateNotes: String(row[INCIDENT_COL.update_notes] || ''),
+    closedBy: String(row[INCIDENT_COL.closed_by] || ''),
+    closureResult: String(row[INCIDENT_COL.closure_result] || ''),
+    isOpen: row[INCIDENT_COL.is_open] === true || String(row[INCIDENT_COL.is_open]).toUpperCase() === 'TRUE',
+    ageMinutes: Number(row[INCIDENT_COL.age_minutes]) || 0,
+    sourceRow: String(row[INCIDENT_COL.source_row] || ''),
+    latitude: formatCoord_(row[INCIDENT_COL.latitude]) || null,
+    longitude: formatCoord_(row[INCIDENT_COL.longitude]) || null
+  };
 }
 
 function formatApiTimestamp_(value) {

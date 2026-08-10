@@ -1,27 +1,25 @@
 import type { Department, Incident, Priority } from '~/types/models'
 import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
 
-export type SitrepDepartmentFilter = 'all' | Department
-export type SitrepPriorityFilter = 'all' | Priority
-export type SitrepStatusFilter = 'open' | 'all' | 'Open' | 'In behandeling' | 'Afgesloten'
+export type SitrepStatusValue = 'open' | 'Open' | 'In behandeling' | 'Afgesloten'
 export type SitrepSortKey = 'priority' | 'newest' | 'oldest' | 'age'
 export type SitrepView = 'map' | 'timeline' | 'analytics'
 
 export interface SitrepListFilters {
-  department: SitrepDepartmentFilter
-  priority: SitrepPriorityFilter
-  status: SitrepStatusFilter
+  department: Department[]
+  priority: Priority[]
+  status: SitrepStatusValue[]
   sort: SitrepSortKey
 }
 
 export const DEFAULT_SITREP_LIST_FILTERS: SitrepListFilters = {
-  department: 'all',
-  priority: 'all',
-  status: 'open',
+  department: [],
+  priority: [],
+  status: ['open'],
   sort: 'priority',
 }
 
-const STATUS_FILTERS: SitrepStatusFilter[] = ['open', 'all', 'Open', 'In behandeling', 'Afgesloten']
+const STATUS_VALUES: SitrepStatusValue[] = ['open', 'Open', 'In behandeling', 'Afgesloten']
 const SORT_KEYS: SitrepSortKey[] = ['priority', 'newest', 'oldest', 'age']
 
 function queryValue(value: string | string[] | null | undefined): string | undefined {
@@ -29,6 +27,14 @@ function queryValue(value: string | string[] | null | undefined): string | undef
     return value[0]
   }
   return value ?? undefined
+}
+
+function queryValues(value: string | string[] | null | undefined): string[] {
+  if (!value) {
+    return []
+  }
+  const raw = Array.isArray(value) ? value : [value]
+  return raw.flatMap(item => item.split(',')).map(item => item.trim()).filter(Boolean)
 }
 
 function isDepartment(value: string): value is Department {
@@ -39,8 +45,35 @@ function isPriority(value: string): value is Priority {
   return (PRIORITIES as readonly string[]).includes(value)
 }
 
-function isStatusFilter(value: string): value is SitrepStatusFilter {
-  return (STATUS_FILTERS as readonly string[]).includes(value)
+function isStatusValue(value: string): value is SitrepStatusValue {
+  return (STATUS_VALUES as readonly string[]).includes(value)
+}
+
+function parseDepartmentFilter(query: Record<string, string | string[] | null | undefined>): Department[] {
+  const values = queryValues(query.dept)
+  if (values.length === 0 || values.includes('all')) {
+    return DEFAULT_SITREP_LIST_FILTERS.department
+  }
+  return values.filter(isDepartment)
+}
+
+function parsePriorityFilter(query: Record<string, string | string[] | null | undefined>): Priority[] {
+  const values = queryValues(query.priority)
+  if (values.length === 0 || values.includes('all')) {
+    return DEFAULT_SITREP_LIST_FILTERS.priority
+  }
+  return values.filter(isPriority)
+}
+
+function parseStatusFilter(query: Record<string, string | string[] | null | undefined>): SitrepStatusValue[] {
+  const values = queryValues(query.status)
+  if (values.length === 0) {
+    return DEFAULT_SITREP_LIST_FILTERS.status
+  }
+  if (values.includes('all')) {
+    return []
+  }
+  return values.filter(isStatusValue)
 }
 
 function isSortKey(value: string): value is SitrepSortKey {
@@ -50,15 +83,12 @@ function isSortKey(value: string): value is SitrepSortKey {
 export function parseSitrepFiltersFromQuery(
   query: Record<string, string | string[] | null | undefined>,
 ): SitrepListFilters {
-  const dept = queryValue(query.dept)
-  const priority = queryValue(query.priority)
-  const status = queryValue(query.status)
   const sort = queryValue(query.sort)
 
   return {
-    department: dept && isDepartment(dept) ? dept : DEFAULT_SITREP_LIST_FILTERS.department,
-    priority: priority && isPriority(priority) ? priority : DEFAULT_SITREP_LIST_FILTERS.priority,
-    status: status && isStatusFilter(status) ? status : DEFAULT_SITREP_LIST_FILTERS.status,
+    department: parseDepartmentFilter(query),
+    priority: parsePriorityFilter(query),
+    status: parseStatusFilter(query),
     sort: sort && isSortKey(sort) ? sort : DEFAULT_SITREP_LIST_FILTERS.sort,
   }
 }
@@ -82,14 +112,14 @@ export function buildSitrepQuery(
 ): Record<string, string> {
   const query: Record<string, string> = {}
 
-  if (filters.department !== DEFAULT_SITREP_LIST_FILTERS.department) {
-    query.dept = filters.department
+  if (filters.department.length > 0) {
+    query.dept = filters.department.join(',')
   }
-  if (filters.priority !== DEFAULT_SITREP_LIST_FILTERS.priority) {
-    query.priority = filters.priority
+  if (filters.priority.length > 0) {
+    query.priority = filters.priority.join(',')
   }
-  if (filters.status !== DEFAULT_SITREP_LIST_FILTERS.status) {
-    query.status = filters.status
+  if (!arraysEqual(filters.status, DEFAULT_SITREP_LIST_FILTERS.status)) {
+    query.status = filters.status.length > 0 ? filters.status.join(',') : 'all'
   }
   if (filters.sort !== DEFAULT_SITREP_LIST_FILTERS.sort) {
     query.sort = filters.sort
@@ -120,22 +150,28 @@ const PRIORITY_ORDER: Record<Priority, number> = {
   Laag: 4,
 }
 
-function matchesDepartment(incident: Incident, filter: SitrepDepartmentFilter): boolean {
-  return filter === 'all' || incident.department === filter
+function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
-function matchesPriority(incident: Incident, filter: SitrepPriorityFilter): boolean {
-  return filter === 'all' || incident.priority === filter
+function matchesDepartment(incident: Incident, filters: Department[]): boolean {
+  return filters.length === 0 || filters.includes(incident.department)
 }
 
-function matchesStatus(incident: Incident, filter: SitrepStatusFilter): boolean {
-  if (filter === 'all') {
+function matchesPriority(incident: Incident, filters: Priority[]): boolean {
+  return filters.length === 0 || filters.includes(incident.priority)
+}
+
+function matchesStatus(incident: Incident, filters: SitrepStatusValue[]): boolean {
+  if (filters.length === 0) {
     return true
   }
-  if (filter === 'open') {
-    return incident.isOpen
-  }
-  return incident.status === filter
+  return filters.some((filter) => {
+    if (filter === 'open') {
+      return incident.isOpen
+    }
+    return incident.status === filter
+  })
 }
 
 function compareIncidents(a: Incident, b: Incident, sort: SitrepSortKey): number {

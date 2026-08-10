@@ -16,6 +16,7 @@ import {
   STATUS_CHART_COLORS,
   barChartOptions,
   doughnutChartOptions,
+  groupedBarChartOptions,
   horizontalBarChartOptions,
   lineChartOptions,
   polarChartOptions,
@@ -29,7 +30,7 @@ const { incidents } = useSitrep()
 
 const doughnutOptions = doughnutChartOptions()
 const barOptions = barChartOptions()
-const stackedBarOptions = barChartOptions(undefined, true)
+const groupedBarOptions = groupedBarChartOptions()
 const lineOptions = lineChartOptions()
 const horizontalBarOptions = horizontalBarChartOptions()
 const polarOptions = polarChartOptions()
@@ -57,6 +58,10 @@ const snapshot = computed(() =>
 
 const visibleChartCount = computed(() =>
   SITREP_ANALYTICS_CHARTS.filter(chart => isChartVisible(chart.id)).length,
+)
+
+const hiddenCharts = computed(() =>
+  SITREP_ANALYTICS_CHARTS.filter(chart => !isChartVisible(chart.id)),
 )
 
 const dataRevision = computed(() =>
@@ -174,6 +179,10 @@ const timelineDepartmentData = computed(() => ({
   })),
 }))
 
+function hideChart(id: SitrepAnalyticsChartId) {
+  setChartVisible(id, false)
+}
+
 function chartVisible(id: SitrepAnalyticsChartId) {
   return isChartVisible(id)
 }
@@ -228,21 +237,25 @@ function chartVisible(id: SitrepAnalyticsChartId) {
 
     <section v-if="settingsOpen" class="ic-sitrep-analytics__settings">
       <div class="ic-sitrep-analytics__settings-head">
-        <h3>Zichtbare grafieken</h3>
+        <h3>Grafieken beheren</h3>
         <div class="ic-sitrep-analytics__settings-actions">
           <button type="button" @click="showAllCharts">
-            Alles aan
+            Alles tonen
           </button>
           <button type="button" @click="hideTrendCharts">
             Alleen live
           </button>
         </div>
       </div>
+      <p class="ic-sitrep-analytics__settings-hint">
+        Vink grafieken aan om ze toe te voegen, of gebruik ✕ op een kaart om te verbergen. Instelling wordt lokaal opgeslagen.
+      </p>
       <div class="ic-sitrep-analytics__settings-grid">
         <label
           v-for="chart in SITREP_ANALYTICS_CHARTS"
           :key="chart.id"
           class="ic-sitrep-analytics__settings-item"
+          :class="{ 'ic-sitrep-analytics__settings-item--hidden': !isChartVisible(chart.id) }"
         >
           <Checkbox
             binary
@@ -255,6 +268,9 @@ function chartVisible(id: SitrepAnalyticsChartId) {
           </span>
         </label>
       </div>
+      <p v-if="hiddenCharts.length > 0" class="ic-sitrep-analytics__settings-hidden">
+        {{ hiddenCharts.length }} verborgen — vink hierboven aan om toe te voegen
+      </p>
     </section>
 
     <div v-if="visibleChartCount === 0" class="ic-sitrep-analytics__empty">
@@ -270,6 +286,8 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         v-if="chartVisible('open-priority')"
         title="Open per prioriteit"
         description="Actieve meldingen op dit moment"
+        removable
+        @remove="hideChart('open-priority')"
       >
         <Doughnut
           :key="`priority-${dataRevision}`"
@@ -282,6 +300,8 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         v-if="chartVisible('open-department')"
         title="Open per afdeling"
         description="Workload per team"
+        removable
+        @remove="hideChart('open-department')"
       >
         <Bar
           :key="`department-${dataRevision}`"
@@ -294,6 +314,8 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         v-if="chartVisible('open-status')"
         title="Open per status"
         description="Open vs in behandeling"
+        removable
+        @remove="hideChart('open-status')"
       >
         <Doughnut
           :key="`status-${dataRevision}`"
@@ -306,6 +328,8 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         v-if="chartVisible('open-types')"
         title="Top incidenttypes"
         description="Meest voorkomende open types"
+        removable
+        @remove="hideChart('open-types')"
       >
         <Bar
           :key="`types-${dataRevision}`"
@@ -319,6 +343,8 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         title="Prioriteitsmix"
         description="Polar overzicht van open meldingen"
         class="ic-sitrep-analytics__wide"
+        removable
+        @remove="hideChart('priority-polar')"
       >
         <PolarArea
           :key="`polar-${dataRevision}`"
@@ -332,6 +358,8 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         title="Meldingen per interval"
         description="Volume in de gekozen periode"
         class="ic-sitrep-analytics__wide"
+        removable
+        @remove="hideChart('timeline-volume')"
       >
         <Line
           :key="`timeline-${dataRevision}`"
@@ -345,11 +373,13 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         title="Trend per prioriteit"
         description="Nieuwe meldingen per interval"
         class="ic-sitrep-analytics__wide"
+        removable
+        @remove="hideChart('timeline-priority')"
       >
         <Bar
           :key="`timeline-priority-${dataRevision}`"
           :data="timelinePriorityData"
-          :options="stackedBarOptions"
+          :options="groupedBarOptions"
         />
       </SitrepAnalyticsChartCard>
 
@@ -358,11 +388,13 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         title="Trend per afdeling"
         description="Nieuwe meldingen per interval"
         class="ic-sitrep-analytics__wide"
+        removable
+        @remove="hideChart('timeline-department')"
       >
         <Bar
           :key="`timeline-department-${dataRevision}`"
           :data="timelineDepartmentData"
-          :options="stackedBarOptions"
+          :options="groupedBarOptions"
         />
       </SitrepAnalyticsChartCard>
     </section>
@@ -414,7 +446,7 @@ function chartVisible(id: SitrepAnalyticsChartId) {
 }
 
 .ic-sitrep-analytics-kpi--critical {
-  background: rgb(186 49 72 / 0.1);
+  background: rgb(153 27 27 / 0.1);
 }
 
 .ic-sitrep-analytics-kpi__value {
@@ -488,6 +520,19 @@ function chartVisible(id: SitrepAnalyticsChartId) {
   color: var(--ic-brand-dark);
 }
 
+.ic-sitrep-analytics__settings-hint {
+  margin: 0 0 0.625rem;
+  font-size: 0.6875rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.ic-sitrep-analytics__settings-hidden {
+  margin: 0.625rem 0 0;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
 .ic-sitrep-analytics__settings-actions {
   display: flex;
   gap: 0.375rem;
@@ -518,6 +563,11 @@ function chartVisible(id: SitrepAnalyticsChartId) {
   border-radius: 0.5rem;
   background: rgb(248 250 252 / 0.9);
   cursor: pointer;
+}
+
+.ic-sitrep-analytics__settings-item--hidden {
+  opacity: 0.72;
+  background: rgb(241 245 249 / 0.9);
 }
 
 .ic-sitrep-analytics__settings-item strong {

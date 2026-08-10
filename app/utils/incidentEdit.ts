@@ -1,0 +1,204 @@
+import type {
+  Department,
+  Incident,
+  IncidentConfig,
+  IncidentUpdate,
+  Priority,
+} from '~/types/models'
+import {
+  formatSector,
+  parseSectorCode,
+  RASTER_COLUMNS,
+  RASTER_ROWS,
+} from '~/utils/incidentOptions'
+
+export interface IncidentEditForm {
+  timestamp: string
+  department: Department
+  locationId: string
+  sectorCode: string
+  sectorLabel: string
+  incidentTypeId: string
+  description: string
+  helpOptionIds: string[]
+  priority: Priority
+  reporter: string
+  freeField: string
+  flagEhbo: boolean
+  flagBeveiliging: boolean
+  flagHcSafety: boolean
+  flagReiniging: boolean
+  flagVeiligheid: boolean
+  status: Incident['status']
+  actionOwner: string
+  scenario: string
+  deadline: string
+  updateNotes: string
+  closedBy: string
+  closureResult: string
+  latitude: string
+  longitude: string
+}
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function resolveLocationId(incident: Incident, config: IncidentConfig | null): string {
+  if (incident.locationId) {
+    return incident.locationId
+  }
+  if (!config) {
+    return ''
+  }
+  const match = config.locations.find(
+    location => normalizeName(location.name) === normalizeName(incident.locationName),
+  )
+  return match?.id ?? ''
+}
+
+function resolveIncidentTypeId(incident: Incident, config: IncidentConfig | null): string {
+  if (incident.incidentTypeId) {
+    return incident.incidentTypeId
+  }
+  if (!config) {
+    return ''
+  }
+  const match = config.incidentTypes.find(
+    type =>
+      type.department === incident.department
+      && normalizeName(type.name) === normalizeName(incident.incidentTypeName),
+  )
+  return match?.id ?? ''
+}
+
+function resolveHelpOptionIds(incident: Incident, config: IncidentConfig | null): string[] {
+  if (incident.helpOptionIds?.length) {
+    return [...incident.helpOptionIds]
+  }
+  if (!config || !incident.helpDeployed) {
+    return []
+  }
+
+  const names = incident.helpDeployed.split(',').map(part => part.trim()).filter(Boolean)
+  const ids: string[] = []
+
+  for (const name of names) {
+    const match = config.helpOptions.find(
+      option => normalizeName(option.name) === normalizeName(name),
+    )
+    if (match) {
+      ids.push(match.id)
+    }
+  }
+
+  return ids
+}
+
+function resolveSectorCode(incident: Incident): string {
+  if (incident.sectorRow && incident.sectorColumn) {
+    return formatSector(incident.sectorRow, incident.sectorColumn)
+  }
+
+  const parsed = parseSectorCode(incident.sector, RASTER_ROWS, RASTER_COLUMNS)
+  return parsed?.code ?? incident.sector ?? ''
+}
+
+function toDatetimeLocalValue(value: string): string {
+  if (!value) {
+    return ''
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const offsetMs = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+export function incidentToEditForm(
+  incident: Incident,
+  config: IncidentConfig | null = null,
+): IncidentEditForm {
+  const sectorCode = resolveSectorCode(incident)
+  const parsedSector = parseSectorCode(sectorCode, RASTER_ROWS, RASTER_COLUMNS)
+
+  return {
+    timestamp: toDatetimeLocalValue(incident.timestamp),
+    department: incident.department,
+    locationId: resolveLocationId(incident, config),
+    sectorCode,
+    sectorLabel: incident.sectorLabel || (parsedSector ? '' : incident.sector || ''),
+    incidentTypeId: resolveIncidentTypeId(incident, config),
+    description: incident.description || '',
+    helpOptionIds: resolveHelpOptionIds(incident, config),
+    priority: incident.priority,
+    reporter: incident.reporter || '',
+    freeField: incident.freeField || '',
+    flagEhbo: incident.flagEhbo ?? false,
+    flagBeveiliging: incident.flagBeveiliging ?? false,
+    flagHcSafety: incident.flagHcSafety ?? false,
+    flagReiniging: incident.flagReiniging ?? false,
+    flagVeiligheid: incident.flagVeiligheid ?? false,
+    status: incident.status || 'Open',
+    actionOwner: incident.actionOwner || '',
+    scenario: incident.scenario || '',
+    deadline: toDatetimeLocalValue(incident.deadline),
+    updateNotes: '',
+    closedBy: incident.closedBy || '',
+    closureResult: incident.closureResult || '',
+    latitude: incident.latitude != null ? String(incident.latitude) : '',
+    longitude: incident.longitude != null ? String(incident.longitude) : '',
+  }
+}
+
+function parseOptionalCoord(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  const parsed = Number(trimmed)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+export function editFormToIncidentUpdate(
+  incidentId: string,
+  form: IncidentEditForm,
+): IncidentUpdate {
+  const parsedSector = parseSectorCode(form.sectorCode, RASTER_ROWS, RASTER_COLUMNS)
+  const sectorLabel = parsedSector
+    ? ''
+    : (form.sectorLabel.trim() || form.sectorCode.trim())
+
+  return {
+    incidentId,
+    status: form.status,
+    timestamp: form.timestamp || undefined,
+    department: form.department,
+    locationId: form.locationId,
+    sectorRow: parsedSector?.row ?? '',
+    sectorColumn: parsedSector?.column ?? null,
+    sectorLabel,
+    incidentTypeId: form.incidentTypeId,
+    description: form.description.trim(),
+    helpOptionIds: form.helpOptionIds,
+    priority: form.priority,
+    reporter: form.reporter.trim(),
+    freeField: form.freeField.trim(),
+    flagEhbo: form.flagEhbo,
+    flagBeveiliging: form.flagBeveiliging,
+    flagHcSafety: form.flagHcSafety,
+    flagReiniging: form.flagReiniging,
+    flagVeiligheid: form.flagVeiligheid,
+    actionOwner: form.actionOwner.trim(),
+    scenario: form.scenario.trim(),
+    deadline: form.deadline || undefined,
+    updateNotes: form.updateNotes.trim() || undefined,
+    closedBy: form.closedBy.trim() || undefined,
+    closureResult: form.closureResult.trim() || undefined,
+    latitude: parseOptionalCoord(form.latitude),
+    longitude: parseOptionalCoord(form.longitude),
+  }
+}

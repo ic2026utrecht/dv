@@ -1,10 +1,10 @@
 import type { Incident, Priority } from '~/types/models'
 
-export type SitrepSeverity = 'critical' | 'warning' | 'ok' | 'closed'
+export type SitrepSeverity = 'critical' | 'high' | 'warning' | 'ok' | 'closed'
 
 const PRIORITY_SEVERITY: Record<Priority, SitrepSeverity> = {
   Critical: 'critical',
-  Hoog: 'critical',
+  Hoog: 'high',
   Middel: 'warning',
   Laag: 'ok',
 }
@@ -19,7 +19,9 @@ export function getIncidentSeverity(incident: Incident): SitrepSeverity {
 export function severityLabel(severity: SitrepSeverity): string {
   switch (severity) {
     case 'critical':
-      return 'Urgent'
+      return 'Critical'
+    case 'high':
+      return 'Hoog'
     case 'warning':
       return 'Aandacht'
     case 'ok':

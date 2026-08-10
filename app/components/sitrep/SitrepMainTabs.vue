@@ -35,7 +35,10 @@ const openCount = computed(() => incidents.value.filter(i => i.isOpen).length)
       </TabList>
       <TabPanels :lazy="false">
         <TabPanel value="map">
-          <SitrepMap :incidents="incidents" />
+          <div class="ic-sitrep-split">
+            <SitrepMap :incidents="incidents" />
+            <SitrepIncidentList />
+          </div>
         </TabPanel>
         <TabPanel value="timeline">
           <SitrepTimeline :incidents="filteredIncidents" embedded />
@@ -109,6 +112,10 @@ const openCount = computed(() => incidents.value.filter(i => i.isOpen).length)
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.ic-sitrep-tabs :deep(.p-tabpanel:has(.ic-sitrep-split)) {
+  overflow: hidden;
 }
 
 .ic-sitrep-tabs__badge {

@@ -84,7 +84,10 @@ function formatTime(timestamp: string): string {
         </button>
         <div class="ic-sitrep-map__legend">
           <span class="ic-sitrep-legend-item">
-            <span class="ic-sitrep-dot ic-sitrep-dot--critical" /> Critical / Hoog
+            <span class="ic-sitrep-dot ic-sitrep-dot--critical" /> Critical
+          </span>
+          <span class="ic-sitrep-legend-item">
+            <span class="ic-sitrep-dot ic-sitrep-dot--high" /> Hoog
           </span>
           <span class="ic-sitrep-legend-item">
             <span class="ic-sitrep-dot ic-sitrep-dot--warning" /> Middel
@@ -324,7 +327,15 @@ function formatTime(timestamp: string): string {
 }
 
 .ic-sitrep-marker--critical .ic-sitrep-marker__pulse {
-  background: rgb(186 49 72 / 0.35);
+  background: rgb(153 27 27 / 0.35);
+}
+
+.ic-sitrep-marker--high {
+  background: var(--ic-high);
+}
+
+.ic-sitrep-marker--high .ic-sitrep-marker__pulse {
+  background: rgb(239 68 68 / 0.35);
 }
 
 .ic-sitrep-marker--warning {

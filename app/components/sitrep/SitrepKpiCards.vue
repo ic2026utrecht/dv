@@ -16,7 +16,7 @@ const emit = defineEmits<{
 const chips = [
   { key: 'open', label: 'Open', variant: 'open' },
   { key: 'criticalOpen', label: 'Critical', variant: 'critical' },
-  { key: 'hoogOpen', label: 'Hoog', variant: 'warning' },
+  { key: 'hoogOpen', label: 'Hoog', variant: 'high' },
   { key: 'closed', label: 'Afgesloten', variant: 'muted' },
 ] as const
 </script>
@@ -123,6 +123,10 @@ const chips = [
 
 .ic-sitrep-kpi-chip__dot--critical {
   background: var(--ic-critical);
+}
+
+.ic-sitrep-kpi-chip__dot--high {
+  background: var(--ic-high);
 }
 
 .ic-sitrep-kpi-chip__dot--warning {

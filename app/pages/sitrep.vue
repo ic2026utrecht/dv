@@ -82,10 +82,7 @@ onBeforeUnmount(() => {
         @refresh="refresh"
       />
 
-      <div class="ic-sitrep-split">
-        <SitrepMainTabs />
-        <SitrepIncidentList />
-      </div>
+      <SitrepMainTabs />
     </div>
 
     <SitrepIncidentCreateDialog

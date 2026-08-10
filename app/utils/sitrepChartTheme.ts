@@ -1,6 +1,6 @@
 export const PRIORITY_CHART_COLORS = {
-  Critical: '#ba3148',
-  Hoog: '#dc2626',
+  Critical: '#991b1b',
+  Hoog: '#ef4444',
   Middel: '#e69732',
   Laag: '#22c55e',
 } as const
@@ -94,6 +94,19 @@ export function barChartOptions(title?: string, stacked = false) {
           precision: 0,
         },
         grid: { color: 'rgba(135, 161, 198, 0.2)' },
+      },
+    },
+  }
+}
+
+/** Side-by-side grouped bars (e.g. trend charts with multiple series per interval). */
+export function groupedBarChartOptions(title?: string) {
+  return {
+    ...barChartOptions(title, false),
+    datasets: {
+      bar: {
+        categoryPercentage: 0.72,
+        barPercentage: 0.9,
       },
     },
   }
