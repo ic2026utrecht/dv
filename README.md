@@ -6,8 +6,8 @@ Nuxt 3 / Vue 3 / PrimeVue web app for incident registration during IC2026 DV.
 | Resource | URL |
 |----------|-----|
 | Sheet | https://docs.google.com/spreadsheets/d/1O0H1ozAEeCEFRUBj_UPbLNw4eAq1CmbQAt3YKpE2A3Q/edit |
-| GitHub | https://github.com/ramonstaal/ic |
-| Live app | https://ramonstaal.github.io/ic/ (after Pages deploy) |
+| GitHub | https://github.com/Brighterflow/ic2026 |
+| Live app | https://brighterflow.github.io/ic2026/ (after Pages deploy) |
 
 ## Architecture
 
@@ -17,17 +17,21 @@ GitHub Pages (Nuxt SPA)
 Apps Script Web App (Api.gs)
     ↓ read/write
 Google Sheet
-  ├── Locations      ← location dropdown (relational)
-  ├── Reference      ← incident types, hulp, prioriteit
-  ├── Incidents      ← normalized rows + ops columns
-  └── Sitrep         ← dashboard (formulas)
+  ├── Locations       ← location dimension (id, name, zone)
+  ├── IncidentTypes   ← incident type dimension
+  ├── HelpOptions     ← help dimension
+  ├── Reference       ← priority, status, legacy lists
+  ├── Incidents       ← fact table (foreign keys + ops columns)
+  ├── Incidents_view  ← human-readable join for ops/Sitrep
+  └── Sitrep          ← dashboard
 ```
 
 Form inputs are mostly **selects**:
-- **Locatie** → `Locations` tab (`id`, `name`, `zone`, `active`)
-- **Sector** → raster rij **A–M** + kolom **1–22** (stored as e.g. `E7`)
-- **Soort incident** → `Reference` tab, filtered by afdeling
-- **Hulp** → multi-select from `Reference`, filtered by afdeling
+- **Locatie** → `Locations` tab (`id` stored on Incidents)
+- **Sector** → raster rij **A–M** + kolom **1–22**
+- **Soort incident** → `IncidentTypes` tab, filtered by afdeling
+- **Hulp** → multi-select from `HelpOptions`, filtered by afdeling
+- **Prioriteit** → four labels (Critical / Hoog / Middel / Laag) — unchanged
 
 ## Project structure (frontend handbook)
 
@@ -57,9 +61,9 @@ pnpm dev
 ## Google Sheet setup
 
 1. Open the Sheet → **Extensions → Apps Script**
-2. Paste all files from `apps-script/` (`Code.gs`, `Reference.gs`, `Locations.gs`, `Sitrep.gs`, `Api.gs`)
-3. Run **`setupWorkbook`**
-4. **Deploy → New deployment → Web app**
+2. Paste all files from `apps-script/` (`Code.gs`, `Api.gs`, `Relational.gs`, `Reference.gs`, `Locations.gs`, `Sitrep.gs`)
+3. Run **`migrateToRelationalSchema`** (existing sheet) or **`setupWorkbook`** (fresh)
+4. **Deploy → Manage deployments → Edit → New version** (keeps same `/exec` URL)
    - Execute as: **Me**
    - Who has access: **Anyone**
 5. Copy the `/exec` URL into:
@@ -68,7 +72,7 @@ pnpm dev
 
 ## GitHub Pages
 
-1. Push to `main` on https://github.com/ramonstaal/ic
+1. Push to `main` on https://github.com/Brighterflow/ic2026 (`git push pages main`)
 2. **Settings → Pages → Build and deployment → GitHub Actions**
 3. Workflow `.github/workflows/deploy-pages.yml` builds with `pnpm generate` and deploys `.output/public`
 
@@ -76,9 +80,10 @@ pnpm dev
 
 | Tab | Edit to change |
 |-----|----------------|
-| **Locations** | Locatie dropdown (add rows: `id`, `name`, `zone`, `active`) |
-| **Reference** cols L/P/N | Incident types per afdeling |
-| **Reference** cols R/S | Hulp options + which afdelingen |
+| **Locations** | Locatie dropdown (`id`, `name`, `zone`, `active`) |
+| **IncidentTypes** | Incident types per afdeling |
+| **HelpOptions** | Hulp options + which afdelingen |
+| **Reference** | Priority ranks, status list |
 
 Raster rows/columns are fixed A–M × 1–22 (see `public/raster-map.png`).
 

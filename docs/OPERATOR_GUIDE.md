@@ -2,7 +2,7 @@
 
 ## Links
 
-- **Webformulier:** https://ramonstaal.github.io/ic/
+- **Webformulier:** https://brighterflow.github.io/ic2026/
 - **Workbook:** https://docs.google.com/spreadsheets/d/1O0H1ozAEeCEFRUBj_UPbLNw4eAq1CmbQAt3YKpE2A3Q/edit
 
 ## Roles

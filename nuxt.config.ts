@@ -1,6 +1,6 @@
 import IC2026Preset from './app/theme/ic2026-preset'
 
-const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'ic'
+const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'ic2026'
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true'
 const baseURL = isGitHubPages ? `/${repoName}/` : '/'
 
