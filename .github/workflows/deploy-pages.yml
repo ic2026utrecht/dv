@@ -1,21 +1,25 @@
 name: Deploy GitHub Pages
 
+# Production: https://<org>.github.io/<repo>/
+# Previews:  https://<org>.github.io/<repo>/preview/<branch-slug>/  (see deploy-pages-preview.yml)
+#
+# Both workflows publish to the gh-pages branch (keep_files: true so they coexist).
+# GitHub Pages → Settings → Build and deployment → Source: Deploy from branch → gh-pages / root
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: pages-production
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,17 +41,10 @@ jobs:
           NUXT_PUBLIC_SUPABASE_URL: ${{ vars.NUXT_PUBLIC_SUPABASE_URL }}
           NUXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NUXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy production to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: .output/public
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: .output/public
+          keep_files: true

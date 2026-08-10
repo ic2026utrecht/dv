@@ -1,0 +1,66 @@
+name: Deploy Pages preview
+
+# Branch previews live at:
+#   https://<org>.github.io/<repo>/preview/<branch-slug>/
+# Example: https://ic2026utrecht.github.io/dv/preview/feat-supabase/
+#
+# Requires GitHub Pages source = "Deploy from branch" → gh-pages / root
+# (see deploy-pages.yml — production and previews share the gh-pages branch)
+
+on:
+  push:
+    branches: [feat/supabase]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build (default: branch you run the workflow from)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
+
+      - name: Branch slug for preview path
+        id: slug
+        run: echo "value=${BRANCH_NAME//\//-}" >> "$GITHUB_OUTPUT"
+        env:
+          BRANCH_NAME: ${{ inputs.branch || github.ref_name }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Generate static site
+        run: pnpm run generate
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          NUXT_PUBLIC_SUPABASE_URL: ${{ vars.NUXT_PUBLIC_SUPABASE_URL }}
+          NUXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NUXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NUXT_PAGES_PREVIEW_PATH: preview/${{ steps.slug.outputs.value }}
+
+      - name: Deploy preview to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: .output/public
+          destination_dir: preview/${{ steps.slug.outputs.value }}
+          keep_files: true
