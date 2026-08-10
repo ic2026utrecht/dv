@@ -1,0 +1,90 @@
+Afdelingen
+Parkeer
+Dienstverlening
+EHBO
+
+Status
+Open
+In behandeling
+Afgesloten
+
+Prioriteit,Rank
+Critical,1
+Hoog,2
+Middel,3
+Laag,4
+
+Locaties
+Hal 12 (NL)
+Hal 11
+Hal 10
+Hal 3 (MIVA)
+Hal 4
+Hal 7 (Engels)
+Hal 8 (Food)
+Hal 9 (Pap)
+Hal 2
+Openbare ruimte - Sector A
+Openbare ruimte - Sector B
+Openbare ruimte - Sector C
+Openbare ruimte - Sector D
+P4
+AXA/Overig
+
+Locatie,Sector
+Hal 12 (NL),B12
+Hal 12 (NL),1J5
+Hal 12 (NL),Algemeen
+Hal 11,Algemeen
+Hal 10,Algemeen
+Hal 3 (MIVA),Algemeen
+Hal 4,Algemeen
+Hal 4,Q8
+Hal 7 (Engels),Algemeen
+Hal 8 (Food),Algemeen
+Hal 9 (Pap),H3
+Hal 9 (Pap),Algemeen
+Hal 2,Algemeen
+Openbare ruimte - Sector A,Sector A
+Openbare ruimte - Sector B,Sector B
+Openbare ruimte - Sector C,Sector C
+Openbare ruimte - Sector D,Sector D
+P4,Parkeervak entree
+P4,P4 algemeen
+AXA/Overig,Overig
+
+Incidenttypen_Parkeer
+Toegang geblokkeerd
+Capaciteit vol
+Bewegwijzering
+Bemanning
+Materieel
+Overig
+
+Incidenttypen_DV
+Medisch - Urgent, 112 gebeld
+Medisch - EHBO
+Beveiliging - ordeverstoorder/ gewelddadig persoon
+Brand/ Rook
+Andersdenkende - <2 personen
+Andersdenkende - >2 personen
+Demonstratie (binnen of buiten)
+Overlast door .... (niet-medisch)
+Vermist persoon (niet-medisch)
+Diefstal
+Technisch (niet-medisch)
+Niet-Medisch Algemeen
+
+Incidenttypen_EHBO
+Medisch urgent (112)
+Medisch EHBO
+Overdracht ziekenhuis
+Meerdere slachtoffers
+Overig medisch
+
+Hulp_opties
+EHBO
+Beveiliging Jaarbeurs
+112 gebeld
+Afd. HC Safety gebeld
+Reiniging of installatie gebeld

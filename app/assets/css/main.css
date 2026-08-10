@@ -1,0 +1,25 @@
+:root {
+  --ic-primary: #1a365d;
+  --ic-accent: #2b6cb0;
+  --ic-critical: #9b2c2c;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+.ic-card {
+  @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+}
+
+.ic-page {
+  @apply mx-auto min-h-screen max-w-3xl px-4 py-8;
+}
+
+.ic-label {
+  @apply mb-1 block text-sm font-medium text-slate-700;
+}
+
+.ic-section-title {
+  @apply mb-4 text-lg font-semibold text-slate-800;
+}
