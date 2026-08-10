@@ -2,17 +2,22 @@
  * IC2026 DV — Incident Sitrep Apps Script
  *
  * Install: open the linked Sheet → Extensions → Apps Script → paste all .gs files
- * Run once: setupWorkbook()
+ * Run once: setupCleanWorkbook()  OR  createCleanWorkbook()
+ * Legacy workbook: migrateToRelationalSchema()
  * Optional: installOnFormSubmitTrigger()
  *
  * Sheet ID: 1O0H1ozAEeCEFRUBj_UPbLNw4eAq1CmbQAt3YKpE2A3Q
  */
 
 var CONFIG = {
-  SPREADSHEET_ID: '1O0H1ozAEeCEFRUBj_UPbLNw4eAq1CmbQAt3YKpE2A3Q',
+  SPREADSHEET_ID: '1O0H1ozAEeCEFRUBj_UPbLNw4eAq1CmbQAt3YKpE2A3Q', // legacy; overridden by Script Property or bound sheet
   RAW_SHEET_NAMES: ['Form Responses 1', 'Formulierreacties 1', 'Responses'],
   REFERENCE_SHEET: 'Reference',
+  LOCATIONS_SHEET: 'Locations',
+  INCIDENT_TYPES_SHEET: 'IncidentTypes',
+  HELP_OPTIONS_SHEET: 'HelpOptions',
   INCIDENTS_SHEET: 'Incidents',
+  INCIDENTS_VIEW_SHEET: 'Incidents_view',
   SITREP_SHEET: 'Sitrep',
   DEFAULT_DEPARTMENT: 'Dienstverlening',
   DEFAULT_STATUS: 'Open',
@@ -20,41 +25,16 @@ var CONFIG = {
   EVENT_NAME: 'IC2026 DV — Situation Report'
 };
 
-var INCIDENT_HEADERS = [
-  'incident_id',
-  'timestamp',
-  'department',
-  'location',
-  'sector',
-  'incident_type',
-  'description',
-  'help_deployed',
-  'priority',
-  'reporter',
-  'status',
-  'action_owner',
-  'deadline',
-  'last_update',
-  'update_notes',
-  'closed_by',
-  'closure_result',
-  'is_open',
-  'age_minutes',
-  'priority_rank',
-  'source_row',
-  'latitude',
-  'longitude'
-];
-
 /**
- * One-shot setup: Reference + Incidents + Sitrep + sync existing rows.
+ * One-shot setup: Reference + dimension tabs + Incidents + Sitrep + sync existing rows.
  */
 function setupWorkbook() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = getSpreadsheet_();
   buildReferenceSheet_(ss);
-  buildLocationsSheet_(ss);
-  buildIncidentsSheet_(ss);
+  ensureDimensionSheets_(ss);
   syncIncidentsFromResponses();
+  buildIncidentsViewSheet_(ss);
+  refreshIncidentsView_(ss);
   buildSitrepSheet_(ss);
   SpreadsheetApp.flush();
   Logger.log('setupWorkbook complete');
@@ -64,21 +44,25 @@ function setupWorkbook() {
  * Re-sync all Form Responses into Incidents (preserves ops edits by source_row).
  */
 function syncIncidentsFromResponses() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = getSpreadsheet_();
   var raw = findRawSheet_(ss);
   if (!raw) {
     throw new Error('Could not find Form Responses sheet. Rename it to "Form Responses 1" or update CONFIG.RAW_SHEET_NAMES.');
   }
+
+  ensureDimensionSheets_(ss);
 
   var incidents = ss.getSheetByName(CONFIG.INCIDENTS_SHEET);
   if (!incidents) {
     incidents = buildIncidentsSheet_(ss);
   }
 
+  var maps = buildLookupMaps_(ss);
   var existingBySource = loadIncidentsBySourceRow_(incidents);
   var rawData = raw.getDataRange().getValues();
   if (rawData.length < 2) {
     Logger.log('No response rows to sync');
+    refreshIncidentsView_(ss);
     return;
   }
 
@@ -90,17 +74,16 @@ function syncIncidentsFromResponses() {
   var outRows = [];
   var nextId = 1;
 
-  // Resolve next ID from existing incidents first
   Object.keys(existingBySource).forEach(function (key) {
-    var num = parseInt(String(existingBySource[key].incident_id).replace(/\D/g, ''), 10);
-    if (!isNaN(num) && num >= nextId) nextId = num + 1;
+    var num = parseIncidentSequence_(existingBySource[key].incident_id);
+    if (num >= nextId) nextId = num + 1;
   });
 
   for (var r = 1; r < rawData.length; r++) {
     var row = rawData[r];
-    var location = String(getCell_(row, col.location) || '').trim();
+    var locationName = String(getCell_(row, col.location) || '').trim();
     var description = resolveDescription_(row, col, headers);
-    if (!row[col.timestamp] && !location && !description) {
+    if (!row[col.timestamp] && !locationName && !description) {
       continue;
     }
 
@@ -111,17 +94,18 @@ function syncIncidentsFromResponses() {
       : CONFIG.INCIDENT_ID_PREFIX + pad3_(nextId++);
 
     var department = getCell_(row, col.department) || CONFIG.DEFAULT_DEPARTMENT;
-    var sector = String(getCell_(row, col.sector) || '').trim();
+    var sectorText = String(getCell_(row, col.sector) || '').trim();
+    var sectorParts = parseSectorText_(sectorText);
     var incidentTypeRaw = String(
       firstNonEmptyFromCols_(row, col.incident_type_cols, col.incident_type) || ''
     ).trim();
-    var incidentType = primaryMultiValue_(incidentTypeRaw);
-    var helpDeployed = normalizeHelp_(
+    var incidentTypeName = primaryMultiValue_(incidentTypeRaw);
+    var helpText = normalizeHelp_(
       firstNonEmptyFromCols_(row, col.help_cols, col.help_deployed)
     );
     var ambulance = getCell_(row, col.ambulance_called);
-    if (String(ambulance).toLowerCase() === 'ja' && helpDeployed.indexOf('112 gebeld') === -1) {
-      helpDeployed = helpDeployed ? helpDeployed + ', 112 gebeld' : '112 gebeld';
+    if (String(ambulance).toLowerCase() === 'ja' && helpText.indexOf('112 gebeld') === -1) {
+      helpText = helpText ? helpText + ', 112 gebeld' : '112 gebeld';
     }
     var persons = getCell_(row, col.persons_involved);
     if (persons !== '' && persons !== null && persons !== undefined) {
@@ -138,49 +122,36 @@ function syncIncidentsFromResponses() {
       : (getCell_(row, col.status) || CONFIG.DEFAULT_STATUS);
     if (!status) status = CONFIG.DEFAULT_STATUS;
 
-    var actionOwner = previous
-      ? previous.action_owner
-      : getCell_(row, col.action_owner);
-    var deadline = previous ? previous.deadline : getCell_(row, col.deadline);
-    var lastUpdate = previous ? previous.last_update : getCell_(row, col.last_update);
-    var updateNotes = previous ? previous.update_notes : getCell_(row, col.update_notes);
-    var closedBy = previous ? previous.closed_by : getCell_(row, col.closed_by);
-    var closureResult = previous
-      ? previous.closure_result
-      : getCell_(row, col.closure_result);
-
-    var isOpen = String(status).trim().toLowerCase() !== 'afgesloten';
-    var priorityRank = priorityToRank_(priority);
-    var ageMinutes = '';
-
-    outRows.push([
-      incidentId,
-      timestamp,
-      department,
-      location,
-      sector,
-      incidentType,
-      description,
-      helpDeployed,
-      priority,
-      reporter,
-      status,
-      actionOwner || '',
-      deadline || '',
-      lastUpdate || '',
-      updateNotes || '',
-      closedBy || '',
-      closureResult || '',
-      isOpen,
-      ageMinutes,
-      priorityRank,
-      sourceRow,
-      '',
-      ''
-    ]);
+    outRows.push(buildIncidentRow_({
+      incidentId: incidentId,
+      timestamp: timestamp,
+      department: department,
+      locationId: resolveLocationIdByName_(locationName, maps.locationsByName),
+      sectorRow: sectorParts.row,
+      sectorColumn: sectorParts.column,
+      sectorLabel: sectorParts.label,
+      incidentTypeId: resolveIncidentTypeIdByName_(
+        incidentTypeName,
+        department,
+        maps.typesByKey
+      ),
+      description: description,
+      helpOptionIds: resolveHelpIdsByNames_(helpText, maps.helpByName),
+      priority: priority,
+      reporter: reporter,
+      status: status,
+      actionOwner: previous ? previous.action_owner : getCell_(row, col.action_owner),
+      deadline: previous ? previous.deadline : getCell_(row, col.deadline),
+      lastUpdate: previous ? previous.last_update : getCell_(row, col.last_update),
+      updateNotes: previous ? previous.update_notes : getCell_(row, col.update_notes),
+      closedBy: previous ? previous.closed_by : getCell_(row, col.closed_by),
+      closureResult: previous ? previous.closure_result : getCell_(row, col.closure_result),
+      sourceRow: sourceRow,
+      latitude: '',
+      longitude: ''
+    }));
   }
 
-  // Renumber any new IDs that collided because previous map was empty
   ensureUniqueIncidentIds_(outRows);
 
   if (incidents.getLastRow() > 1) {
@@ -189,10 +160,12 @@ function syncIncidentsFromResponses() {
   }
   if (outRows.length) {
     incidents.getRange(2, 1, outRows.length, INCIDENT_HEADERS.length).setValues(outRows);
-    applyIncidentDerivedFormulas_(incidents, outRows.length);
+    applyIncidentDerivedFormulas_(incidents, 2, outRows.length + 1);
   }
 
   applyIncidentsFormatting_(incidents);
+  applyIncidentsStatusValidation_(incidents);
+  refreshIncidentsView_(ss);
   Logger.log('Synced ' + outRows.length + ' incidents');
 }
 
@@ -200,7 +173,7 @@ function syncIncidentsFromResponses() {
  * Install installable onFormSubmit trigger (run once as sheet owner).
  */
 function installOnFormSubmitTrigger() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = getSpreadsheet_();
   var triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(function (t) {
     if (t.getHandlerFunction() === 'onFormSubmitSync') {
@@ -228,7 +201,6 @@ function findRawSheet_(ss) {
     var sh = ss.getSheetByName(name);
     if (sh) return sh;
   }
-  // Fallback: first sheet whose header contains Tijdstempel
   for (var j = 0; j < sheets.length; j++) {
     var header = sheets[j].getRange(1, 1).getValue();
     if (String(header).toLowerCase().indexOf('tijdstempel') !== -1 ||
@@ -371,37 +343,38 @@ function pad3_(n) {
   return s;
 }
 
-/** Adds new Incidents columns (e.g. latitude/longitude) without wiping existing data. */
-function ensureIncidentGeoColumns_(ss) {
-  var sheet = ss.getSheetByName(CONFIG.INCIDENTS_SHEET);
-  if (!sheet || sheet.getLastRow() < 1) return;
-
-  var headerCount = sheet.getLastColumn();
-  var expected = INCIDENT_HEADERS.length;
-  if (headerCount >= expected) return;
-
-  var newHeaders = INCIDENT_HEADERS.slice(headerCount);
-  sheet.getRange(1, headerCount + 1, 1, headerCount + newHeaders.length)
-    .setValues([newHeaders]);
+/** Numeric suffix only — do not strip digits from INC-2026- prefix (old bug used replace(/\D/g)). */
+function parseIncidentSequence_(id) {
+  var s = String(id || '').trim();
+  if (!s) return 0;
+  var suffix = s.indexOf(CONFIG.INCIDENT_ID_PREFIX) === 0
+    ? s.slice(CONFIG.INCIDENT_ID_PREFIX.length)
+    : s.split('-').pop();
+  var num = parseInt(String(suffix || '').replace(/\D/g, ''), 10);
+  if (isNaN(num) || num < 0) return 0;
+  // Ignore IDs corrupted by the old all-digits parser (e.g. INC-2026-2026002).
+  if (num > 999999) return 0;
+  return num;
 }
 
 function loadIncidentsBySourceRow_(sheet) {
   var map = {};
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return map;
-  var data = sheet.getRange(2, 1, lastRow - 1, INCIDENT_HEADERS.length).getValues();
+  var colCount = Math.max(sheet.getLastColumn(), INCIDENT_HEADERS.length);
+  var data = sheet.getRange(2, 1, lastRow - 1, colCount).getValues();
   for (var i = 0; i < data.length; i++) {
-    var sourceRow = data[i][20];
+    var sourceRow = data[i][INCIDENT_COL.source_row];
     if (!sourceRow) continue;
     map[sourceRow] = {
-      incident_id: data[i][0],
-      status: data[i][10],
-      action_owner: data[i][11],
-      deadline: data[i][12],
-      last_update: data[i][13],
-      update_notes: data[i][14],
-      closed_by: data[i][15],
-      closure_result: data[i][16]
+      incident_id: data[i][INCIDENT_COL.incident_id],
+      status: data[i][INCIDENT_COL.status],
+      action_owner: data[i][INCIDENT_COL.action_owner],
+      deadline: data[i][INCIDENT_COL.deadline],
+      last_update: data[i][INCIDENT_COL.last_update],
+      update_notes: data[i][INCIDENT_COL.update_notes],
+      closed_by: data[i][INCIDENT_COL.closed_by],
+      closure_result: data[i][INCIDENT_COL.closure_result]
     };
   }
   return map;
@@ -411,33 +384,15 @@ function ensureUniqueIncidentIds_(rows) {
   var seen = {};
   var maxNum = 0;
   rows.forEach(function (r) {
-    var id = String(r[0]);
-    var num = parseInt(id.replace(/\D/g, ''), 10);
+    var id = String(r[INCIDENT_COL.incident_id]);
+    var num = parseIncidentSequence_(id);
     if (!isNaN(num) && num > maxNum) maxNum = num;
     if (seen[id]) {
       maxNum += 1;
-      r[0] = CONFIG.INCIDENT_ID_PREFIX + pad3_(maxNum);
+      r[INCIDENT_COL.incident_id] = CONFIG.INCIDENT_ID_PREFIX + pad3_(maxNum);
     }
-    seen[r[0]] = true;
+    seen[r[INCIDENT_COL.incident_id]] = true;
   });
-}
-
-function applyIncidentDerivedFormulas_(sheet, rowCount) {
-  for (var i = 0; i < rowCount; i++) {
-    var row = i + 2;
-    // is_open
-    sheet.getRange(row, 18).setFormula(
-      '=IF(K' + row + '="";TRUE;LOWER(TRIM(K' + row + '))<>"afgesloten")'
-    );
-    // age_minutes
-    sheet.getRange(row, 19).setFormula(
-      '=IF(B' + row + '="";"";ROUND((NOW()-B' + row + ')*24*60,0))'
-    );
-    // priority_rank
-    sheet.getRange(row, 20).setFormula(
-      '=IFERROR(VLOOKUP(I' + row + ';Reference!$D$3:$E$6;2;FALSE);9)'
-    );
-  }
 }
 
 function applyIncidentsFormatting_(sheet) {
@@ -446,6 +401,7 @@ function applyIncidentsFormatting_(sheet) {
     .setFontWeight('bold')
     .setBackground('#1a365d')
     .setFontColor('#ffffff');
+  sheet.getRange('A:A').setNumberFormat('@');
   sheet.autoResizeColumns(1, Math.min(12, INCIDENT_HEADERS.length));
 }
 
@@ -458,13 +414,37 @@ function buildIncidentsSheet_(ss) {
   }
   sheet.getRange(1, 1, 1, INCIDENT_HEADERS.length).setValues([INCIDENT_HEADERS]);
   applyIncidentsFormatting_(sheet);
-
-  // Data validation for status
-  var statusRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['Open', 'In behandeling', 'Afgesloten'], true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange('K2:K1000').setDataValidation(statusRule);
-
+  applyIncidentsStatusValidation_(sheet);
   return sheet;
+}
+
+function slugId_(text) {
+  return String(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function defaultIncidentTypes_() {
+  return [
+    { id: 'parkeer-toegang-geblokkeerd', department: 'Parkeer', name: 'Toegang geblokkeerd' },
+    { id: 'dienstverlening-brand-rook', department: 'Dienstverlening', name: 'Brand/ Rook' },
+    { id: 'ehbo-medisch-ehbo', department: 'EHBO', name: 'Medisch EHBO' }
+  ];
+}
+
+function defaultHelpOptions_() {
+  var names = [
+    'EHBO', 'Beveiliging Jaarbeurs', '112 gebeld',
+    'Afd. HC Safety gebeld', 'Reiniging of installatie gebeld'
+  ];
+  return names.map(function (name) {
+    return {
+      id: slugId_('help-' + name),
+      name: name,
+      departments: name === 'EHBO'
+        ? ['EHBO']
+        : ['Parkeer', 'Dienstverlening', 'EHBO']
+    };
+  });
 }

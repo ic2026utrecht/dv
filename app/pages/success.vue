@@ -30,8 +30,17 @@ const incidentId = computed(() => route.query.id as string | undefined)
 
       <div class="space-y-4 px-6 py-8">
         <p class="text-sm leading-relaxed text-slate-600">
-          Ops kan de melding volgen op het <strong>Sitrep</strong>-tabblad in Google Sheets.
+          Ops kan de melding volgen op het <strong>Sitrep</strong>-dashboard of het tabblad in Google Sheets.
         </p>
+        <Button
+          label="Sitrep dashboard"
+          icon="pi pi-chart-bar"
+          size="large"
+          severity="secondary"
+          outlined
+          class="w-full"
+          @click="navigateTo('/sitrep')"
+        />
         <Button
           label="Nieuwe melding"
           icon="pi pi-plus"
