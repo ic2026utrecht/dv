@@ -1,6 +1,13 @@
 import type { IncidentConfig, IncidentSubmission, IncidentSubmissionResult } from '~/types/models'
+import {
+  INCIDENT_CONFIG_CACHE_TTL_MS,
+  readIncidentConfigCache,
+  writeIncidentConfigCache,
+} from '~/utils/incidentConfigCache'
 
-const CACHE_TTL_MS = 5 * 60 * 1000
+function isStoreConfigFresh(loadedAt: number | null): boolean {
+  return loadedAt !== null && Date.now() - loadedAt < INCIDENT_CONFIG_CACHE_TTL_MS
+}
 
 export const useIncidents = () => {
   const { $api } = useNuxtApp()
@@ -10,10 +17,17 @@ export const useIncidents = () => {
     if (
       !refresh
       && store.config
-      && store.loadedAt
-      && Date.now() - store.loadedAt < CACHE_TTL_MS
+      && isStoreConfigFresh(store.loadedAt)
     ) {
       return store.config
+    }
+
+    if (!refresh) {
+      const cached = readIncidentConfigCache()
+      if (cached) {
+        store.setConfig(cached)
+        return cached
+      }
     }
 
     store.setLoading(true)
@@ -22,6 +36,7 @@ export const useIncidents = () => {
     try {
       const response = await $api.incidents.getConfig()
       store.setConfig(response.data)
+      writeIncidentConfigCache(response.data)
       return response.data
     }
     catch (error: unknown) {
