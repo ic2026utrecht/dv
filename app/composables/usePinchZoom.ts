@@ -1,8 +1,24 @@
-export function usePinchZoom(options?: { minScale?: number, maxScale?: number }) {
-  const minScale = options?.minScale ?? 1
-  const maxScale = options?.maxScale ?? 5
+export interface PinchZoomClampBounds {
+  viewportW: number
+  viewportH: number
+  contentW: number
+  contentH: number
+}
 
-  const scale = ref(1)
+export function usePinchZoom(options?: {
+  minScale?: number
+  maxScale?: number
+  /** Lower = slower pinch zoom (0.5 is half as aggressive as linear). */
+  pinchExponent?: number
+  /** Wheel zoom step as a fraction of current scale per tick. */
+  wheelStep?: number
+}) {
+  const minScale = ref(options?.minScale ?? 1)
+  const maxScale = options?.maxScale ?? 5
+  const pinchExponent = options?.pinchExponent ?? 0.35
+  const wheelStep = options?.wheelStep ?? 0.04
+
+  const scale = ref(minScale.value)
   const translateX = ref(0)
   const translateY = ref(0)
 
@@ -15,13 +31,55 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   let isPanning = false
   let activePointerId: number | null = null
   let gestureMoved = false
+  let getClampBounds: (() => PinchZoomClampBounds | null) | null = null
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value))
   }
 
-  function reset() {
-    scale.value = 1
+  function clampTranslation() {
+    const bounds = getClampBounds?.()
+    if (!bounds) {
+      return
+    }
+
+    const { viewportW, viewportH, contentW, contentH } = bounds
+    const scaledW = contentW * scale.value
+    const scaledH = contentH * scale.value
+
+    if (scaledW <= viewportW) {
+      translateX.value = 0
+    }
+    else {
+      const maxTx = (scaledW - viewportW) / 2
+      translateX.value = clamp(translateX.value, -maxTx, maxTx)
+    }
+
+    if (scaledH <= viewportH) {
+      translateY.value = 0
+    }
+    else {
+      const maxTy = (scaledH - viewportH) / 2
+      translateY.value = clamp(translateY.value, -maxTy, maxTy)
+    }
+  }
+
+  function setClampBounds(getter: () => PinchZoomClampBounds | null) {
+    getClampBounds = getter
+  }
+
+  function setMinScale(value: number) {
+    minScale.value = value
+    if (scale.value < value) {
+      resetToFit(value)
+    }
+    else {
+      clampTranslation()
+    }
+  }
+
+  function resetToFit(nextScale = minScale.value) {
+    scale.value = nextScale
     translateX.value = 0
     translateY.value = 0
     isPanning = false
@@ -29,13 +87,18 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
     gestureMoved = false
   }
 
+  function reset() {
+    resetToFit(minScale.value)
+  }
+
   function normalizeScale() {
-    scale.value = clamp(scale.value, minScale, maxScale)
-    if (scale.value <= minScale) {
-      scale.value = minScale
+    scale.value = clamp(scale.value, minScale.value, maxScale)
+    if (scale.value <= minScale.value) {
+      scale.value = minScale.value
       translateX.value = 0
       translateY.value = 0
     }
+    clampTranslation()
   }
 
   function markMoved(clientX: number, clientY: number) {
@@ -66,7 +129,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
       panStartX = event.touches[0]!.clientX
       panStartY = event.touches[0]!.clientY
 
-      if (scale.value > minScale) {
+      if (scale.value > minScale.value) {
         isPanning = true
         panOriginX = translateX.value
         panOriginY = translateY.value
@@ -79,7 +142,10 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
       event.preventDefault()
       gestureMoved = true
       const distance = getTouchDistance(event.touches)
-      scale.value = clamp(pinchStartScale * (distance / pinchStartDistance), minScale, maxScale)
+      const ratio = distance / pinchStartDistance
+      const dampedRatio = Math.pow(ratio, pinchExponent)
+      scale.value = clamp(pinchStartScale * dampedRatio, minScale.value, maxScale)
+      clampTranslation()
       return
     }
 
@@ -91,6 +157,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
         event.preventDefault()
         translateX.value = panOriginX + (touch.clientX - panStartX)
         translateY.value = panOriginY + (touch.clientY - panStartY)
+        clampTranslation()
       }
     }
   }
@@ -105,8 +172,8 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
 
   function onWheel(event: WheelEvent) {
     event.preventDefault()
-    const delta = event.deltaY > 0 ? -0.12 : 0.12
-    scale.value = clamp(scale.value + delta, minScale, maxScale)
+    const factor = event.deltaY > 0 ? 1 - wheelStep : 1 + wheelStep
+    scale.value = clamp(scale.value * factor, minScale.value, maxScale)
     normalizeScale()
   }
 
@@ -120,7 +187,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
     panStartY = event.clientY
     activePointerId = event.pointerId
 
-    if (scale.value > minScale) {
+    if (scale.value > minScale.value) {
       isPanning = true
       panOriginX = translateX.value
       panOriginY = translateY.value
@@ -141,6 +208,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
 
     translateX.value = panOriginX + (event.clientX - panStartX)
     translateY.value = panOriginY + (event.clientY - panStartY)
+    clampTranslation()
   }
 
   function onPointerUp(event: PointerEvent): boolean {
@@ -162,10 +230,15 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
 
   return {
     scale,
+    minScale,
     translateX,
     translateY,
     transformStyle,
     reset,
+    resetToFit,
+    setMinScale,
+    setClampBounds,
+    clampTranslation,
     onTouchStart,
     onTouchMove,
     onTouchEnd,

@@ -13,6 +13,12 @@ function onSubmitted(incidentId: string) {
         subtitle="Melding gaat direct naar het Sitrep-overzicht in Google Sheets"
         :step="1"
       />
+      <div class="ic-sitrep-nav">
+        <NuxtLink to="/sitrep" class="ic-sitrep-nav__link">
+          <i class="pi pi-chart-bar" aria-hidden="true" />
+          Sitrep dashboard
+        </NuxtLink>
+      </div>
       <IncidentForm @submitted="onSubmitted" />
     </div>
   </div>

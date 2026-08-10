@@ -2,13 +2,16 @@
  * REST API for the IC2026 incident web app (GitHub Pages).
  * Deploy: Deploy → New deployment → Web app → Execute as: Me → Who has access: Anyone
  *
- * GET  ?action=config  → reference data + locations
- * POST { incident }    → append row to Incidents
+ * GET  ?action=config           → reference data + locations
+ * GET  ?action=incidents        → all rows from Incidents_view (JSONP)
+ * GET  ?action=update&payload=  → update incident ops fields (JSONP)
+ * GET  ?action=submit&payload=  → append row (JSONP, used by browser)
+ * POST { incident }             → append row (curl / server clients)
  */
 
 var API_CONFIG = {
   LOCATIONS_SHEET: 'Locations',
-  CORS_ORIGINS: ['*'] // tighten to https://ramonstaal.github.io in production if desired
+  CORS_ORIGINS: ['*']
 };
 
 function doGet(e) {
@@ -19,15 +22,29 @@ function doGet(e) {
     if (action === 'config') {
       return respond_(callback, { data: getIncidentConfig_() });
     }
+    if (action === 'incidents') {
+      var ss = getSpreadsheet_();
+      ensureWorkbookSheets_(ss);
+      return respond_(callback, { data: readIncidentsView_(ss) });
+    }
+    if (action === 'update' || action === 'updateIncident') {
+      var updateRaw = (e && e.parameter && e.parameter.payload) || '{}';
+      var updateBody = JSON.parse(updateRaw);
+      var updateResult = updateIncidentFromWebApp_(updateBody);
+      return respond_(callback, { data: updateResult });
+    }
+    if (action === 'submit') {
+      var raw = (e && e.parameter && e.parameter.payload) || '{}';
+      var body = JSON.parse(raw);
+      var result = createIncidentFromWebApp_(body);
+      return respond_(callback, { data: result });
+    }
     return respond_(callback, { error: 'Unknown action' });
   } catch (err) {
     return respond_(callback, { error: String(err.message || err) });
   }
 }
 
-/**
- * JSON for direct browser navigation; JSONP for cross-origin fetch from the web app.
- */
 function respond_(callback, payload) {
   var json = JSON.stringify(payload);
   if (callback) {
@@ -43,6 +60,10 @@ function doPost(e) {
     if (e && e.postData && e.postData.contents) {
       body = JSON.parse(e.postData.contents);
     }
+    if (body.incidentId && body.status) {
+      var updateResult = updateIncidentFromWebApp_(body);
+      return jsonResponse_({ data: updateResult });
+    }
     var result = createIncidentFromWebApp_(body);
     return jsonResponse_({ data: result });
   } catch (err) {
@@ -53,13 +74,11 @@ function doPost(e) {
 function jsonResponse_(payload, status) {
   var output = ContentService.createTextOutput(JSON.stringify(payload));
   output.setMimeType(ContentService.MimeType.JSON);
-  // Note: Apps Script cannot set Access-Control-Allow-Origin on Web App responses.
-  // Use Content-Type text/plain on client POST to avoid preflight, or deploy with redirect handling.
   return output;
 }
 
 function getIncidentConfig_() {
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = getSpreadsheet_();
   ensureWorkbookSheets_(ss);
 
   return {
@@ -74,6 +93,8 @@ function getIncidentConfig_() {
       { value: 'Middel', label: 'Middel' },
       { value: 'Laag', label: 'Laag' }
     ],
+    supportedActions: ['config', 'submit', 'incidents', 'update', 'updateIncident'],
+    apiVersion: 2,
     locations: readLocations_(ss),
     incidentTypes: readIncidentTypes_(ss),
     helpOptions: readHelpOptions_(ss),
@@ -90,7 +111,7 @@ function getIncidentConfig_() {
 function createIncidentFromWebApp_(body) {
   validateSubmission_(body);
 
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  var ss = getSpreadsheet_();
   ensureWorkbookSheets_(ss);
 
   var locations = readLocations_(ss);
@@ -110,51 +131,41 @@ function createIncidentFromWebApp_(body) {
     throw new Error('Incidenttype hoort niet bij geselecteerde afdeling');
   }
 
-  var helpNames = (body.helpOptionIds || []).map(function (id) {
-    var opt = helpOptions.filter(function (h) {
-      return h.id === id;
-    })[0];
-    return opt ? opt.name : null;
-  }).filter(Boolean);
-
-  if (body.ambulanceCalled === true && helpNames.indexOf('112 gebeld') === -1) {
-    helpNames.push('112 gebeld');
-  }
-
-  var sector = String(body.sectorRow) + String(body.sectorColumn);
   var description = String(body.description || '').trim();
   if (body.personsInvolved) {
     description += ' [betrokkenen: ' + body.personsInvolved + ']';
   }
 
-  var incidents = ss.getSheetByName(CONFIG.INCIDENTS_SHEET);
-  ensureIncidentGeoColumns_(ss);
+  var incidents = ss.getSheetByName(configSheet_('INCIDENTS_SHEET', 'Incidents'));
   var incidentId = nextIncidentId_(incidents);
 
-  var row = [
-    incidentId,
-    new Date(),
-    body.department,
-    location.name,
-    sector,
-    incidentType.name,
-    description,
-    helpNames.join(', '),
-    body.priority,
-    String(body.reporter || '').trim(),
-    CONFIG.DEFAULT_STATUS,
-    '', '', '', '', '', '',
-    true,
-    '',
-    priorityToRank_(body.priority),
-    'webapp',
-    formatCoord_(body.latitude),
-    formatCoord_(body.longitude)
-  ];
+  var row = buildIncidentRow_({
+    incidentId: incidentId,
+    timestamp: new Date(),
+    department: body.department,
+    locationId: body.locationId,
+    sectorRow: body.sectorRow,
+    sectorColumn: body.sectorColumn,
+    sectorLabel: '',
+    incidentTypeId: body.incidentTypeId,
+    description: description,
+    helpOptionIds: resolveHelpIdsFromList_(
+      body.helpOptionIds,
+      helpOptions,
+      body.ambulanceCalled
+    ),
+    priority: body.priority,
+    reporter: String(body.reporter || '').trim(),
+    status: CONFIG.DEFAULT_STATUS,
+    sourceRow: 'webapp',
+    latitude: formatCoord_(body.latitude),
+    longitude: formatCoord_(body.longitude)
+  });
 
   incidents.appendRow(row);
   var newRow = incidents.getLastRow();
   applySingleIncidentFormulas_(incidents, newRow);
+  refreshIncidentsView_(ss);
 
   return {
     incidentId: incidentId,
@@ -216,18 +227,26 @@ function readLocations_(ss) {
       active: row[3] === true || String(row[3]).toUpperCase() === 'TRUE'
     };
   }).filter(function (l) {
-    return l.id && l.name;
+    return l.id && l.name && l.active !== false;
   });
 }
 
 function readIncidentTypes_(ss) {
-  var sheet = ss.getSheetByName(CONFIG.REFERENCE_SHEET);
-  if (!sheet) return defaultIncidentTypes_();
+  var sheet = ss.getSheetByName(CONFIG.INCIDENT_TYPES_SHEET);
+  if (sheet && sheet.getLastRow() >= 2) {
+    var fromSheet = readIncidentTypesFromSheet_(sheet);
+    if (fromSheet.length) {
+      return fromSheet;
+    }
+  }
+
+  var ref = ss.getSheetByName(CONFIG.REFERENCE_SHEET);
+  if (!ref) return defaultIncidentTypes_();
 
   var types = [];
-  types = types.concat(readTypeBlock_(sheet, 12, 'Parkeer'));
-  types = types.concat(readTypeBlock_(sheet, 14, 'Dienstverlening'));
-  types = types.concat(readTypeBlock_(sheet, 16, 'EHBO'));
+  types = types.concat(readTypeBlock_(ref, 12, 'Parkeer'));
+  types = types.concat(readTypeBlock_(ref, 14, 'Dienstverlening'));
+  types = types.concat(readTypeBlock_(ref, 16, 'EHBO'));
   return types.length ? types : defaultIncidentTypes_();
 }
 
@@ -247,15 +266,23 @@ function readTypeBlock_(sheet, col, department) {
 }
 
 function readHelpOptions_(ss) {
-  var sheet = ss.getSheetByName(CONFIG.REFERENCE_SHEET);
-  var defaults = defaultHelpOptions_();
-  if (!sheet) return defaults;
+  var sheet = ss.getSheetByName(CONFIG.HELP_OPTIONS_SHEET);
+  if (sheet && sheet.getLastRow() >= 2) {
+    var fromSheet = readHelpOptionsFromSheet_(sheet);
+    if (fromSheet.length) {
+      return fromSheet;
+    }
+  }
 
-  var lastRow = sheet.getLastRow();
+  var ref = ss.getSheetByName(CONFIG.REFERENCE_SHEET);
+  var defaults = defaultHelpOptions_();
+  if (!ref) return defaults;
+
+  var lastRow = ref.getLastRow();
   var out = [];
   for (var r = 2; r <= lastRow; r++) {
-    var name = String(sheet.getRange(r, 18).getValue() || '').trim();
-    var depts = String(sheet.getRange(r, 19).getValue() || '').trim();
+    var name = String(ref.getRange(r, 18).getValue() || '').trim();
+    var depts = String(ref.getRange(r, 19).getValue() || '').trim();
     if (!name) continue;
     out.push({
       id: slugId_('help-' + name),
@@ -268,37 +295,6 @@ function readHelpOptions_(ss) {
   return out.length ? out : defaults;
 }
 
-function defaultIncidentTypes_() {
-  return [
-    { id: 'parkeer-toegang', department: 'Parkeer', name: 'Toegang geblokkeerd' },
-    { id: 'dv-brand', department: 'Dienstverlening', name: 'Brand/ Rook' },
-    { id: 'ehbo-medisch', department: 'EHBO', name: 'Medisch EHBO' }
-  ];
-}
-
-function defaultHelpOptions_() {
-  var names = [
-    'EHBO', 'Beveiliging Jaarbeurs', '112 gebeld',
-    'Afd. HC Safety gebeld', 'Reiniging of installatie gebeld'
-  ];
-  return names.map(function (name) {
-    return {
-      id: slugId_('help-' + name),
-      name: name,
-      departments: name === 'EHBO'
-        ? ['EHBO']
-        : ['Parkeer', 'Dienstverlening', 'EHBO']
-    };
-  });
-}
-
-function slugId_(text) {
-  return String(text)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
 function rangeInt_(start, end) {
   var arr = [];
   for (var i = start; i <= end; i++) arr.push(i);
@@ -307,21 +303,120 @@ function rangeInt_(start, end) {
 
 function ensureWorkbookSheets_(ss) {
   if (!ss.getSheetByName(CONFIG.REFERENCE_SHEET)) buildReferenceSheet_(ss);
-  if (!ss.getSheetByName(API_CONFIG.LOCATIONS_SHEET)) buildLocationsSheet_(ss);
-  if (!ss.getSheetByName(CONFIG.INCIDENTS_SHEET)) buildIncidentsSheet_(ss);
-  ensureIncidentGeoColumns_(ss);
+  ensureDimensionSheets_(ss);
+  if (!ss.getSheetByName(CONFIG.INCIDENTS_VIEW_SHEET)) {
+    buildIncidentsViewSheet_(ss);
+  }
 }
 
-function applySingleIncidentFormulas_(sheet, row) {
-  sheet.getRange(row, 18).setFormula(
-    '=IF(K' + row + '="";TRUE;LOWER(TRIM(K' + row + '))<>"afgesloten")'
-  );
-  sheet.getRange(row, 19).setFormula(
-    '=IF(B' + row + '="";"";ROUND((NOW()-B' + row + ')*24*60,0))'
-  );
-  sheet.getRange(row, 20).setFormula(
-    '=IFERROR(VLOOKUP(I' + row + ';Reference!$D$3:$E$6;2;FALSE);9)'
-  );
+function updateIncidentFromWebApp_(body) {
+  if (!body.incidentId) {
+    throw new Error('incidentId verplicht');
+  }
+  if (!body.status) {
+    throw new Error('status verplicht');
+  }
+
+  var status = normalizeStatus_(body.status);
+  var allowed = ['Open', 'In behandeling', 'Afgesloten'];
+  if (allowed.indexOf(status) === -1) {
+    throw new Error('Ongeldige status');
+  }
+
+  var ss = getSpreadsheet_();
+  ensureWorkbookSheets_(ss);
+  var sheet = ss.getSheetByName(configSheet_('INCIDENTS_SHEET', 'Incidents'));
+  var rowNum = findIncidentRowById_(sheet, body.incidentId);
+  if (!rowNum) {
+    throw new Error('Incident niet gevonden: ' + body.incidentId);
+  }
+
+  sheet.getRange(rowNum, INCIDENT_COL.status + 1).setValue(status);
+  sheet.getRange(rowNum, INCIDENT_COL.last_update + 1).setValue(new Date());
+
+  if (body.actionOwner !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.action_owner + 1).setValue(String(body.actionOwner || ''));
+  }
+  if (body.updateNotes !== undefined) {
+    sheet.getRange(rowNum, INCIDENT_COL.update_notes + 1).setValue(String(body.updateNotes || ''));
+  }
+  if (status === 'Afgesloten') {
+    if (body.closedBy) {
+      sheet.getRange(rowNum, INCIDENT_COL.closed_by + 1).setValue(String(body.closedBy));
+    }
+    if (body.closureResult) {
+      sheet.getRange(rowNum, INCIDENT_COL.closure_result + 1).setValue(String(body.closureResult));
+    }
+  }
+
+  applySingleIncidentFormulas_(sheet, rowNum);
+  refreshIncidentsView_(ss);
+
+  return {
+    incidentId: body.incidentId,
+    status: status,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function findIncidentRowById_(sheet, incidentId) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return 0;
+  }
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(incidentId)) {
+      return i + 2;
+    }
+  }
+  return 0;
+}
+
+function readIncidentsView_(ss) {
+  refreshIncidentsView_(ss);
+  var view = ss.getSheetByName(configSheet_('INCIDENTS_VIEW_SHEET', 'Incidents_view'));
+  if (!view || view.getLastRow() < 2) {
+    return [];
+  }
+
+  var data = view.getRange(2, 1, view.getLastRow() - 1, INCIDENTS_VIEW_HEADERS.length).getValues();
+  return data.map(function (row) {
+    return {
+      incidentId: String(row[0] || ''),
+      timestamp: formatApiTimestamp_(row[1]),
+      department: String(row[2] || ''),
+      locationName: String(row[3] || ''),
+      zone: String(row[4] || ''),
+      sector: String(row[5] || ''),
+      incidentTypeName: String(row[6] || ''),
+      description: String(row[7] || ''),
+      helpDeployed: String(row[8] || ''),
+      priority: String(row[9] || ''),
+      priorityRank: Number(row[10]) || 4,
+      reporter: String(row[11] || ''),
+      status: String(row[12] || ''),
+      actionOwner: String(row[13] || ''),
+      deadline: formatApiTimestamp_(row[14]),
+      isOpen: row[15] === true || String(row[15]).toUpperCase() === 'TRUE',
+      ageMinutes: Number(row[16]) || 0,
+      sourceRow: String(row[17] || ''),
+      latitude: formatCoord_(row[18]) || null,
+      longitude: formatCoord_(row[19]) || null
+    };
+  }).filter(function (item) {
+    return item.incidentId;
+  });
+}
+
+function formatApiTimestamp_(value) {
+  if (!value && value !== 0) {
+    return '';
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value);
 }
 
 function nextIncidentId_(incidentsSheet) {
@@ -330,15 +425,9 @@ function nextIncidentId_(incidentsSheet) {
   if (lastRow >= 2) {
     var ids = incidentsSheet.getRange(2, 1, lastRow - 1, 1).getValues();
     ids.forEach(function (row) {
-      var num = parseInt(String(row[0]).replace(/\D/g, ''), 10);
-      if (!isNaN(num) && num > maxNum) maxNum = num;
+      var num = parseIncidentSequence_(row[0]);
+      if (num > maxNum) maxNum = num;
     });
   }
   return CONFIG.INCIDENT_ID_PREFIX + pad3_(maxNum + 1);
-}
-
-function applyIncidentDerivedFormulas_(sheet, startRow, endRow) {
-  for (var row = startRow; row <= endRow; row++) {
-    applySingleIncidentFormulas_(sheet, row);
-  }
 }

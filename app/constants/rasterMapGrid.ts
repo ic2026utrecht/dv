@@ -53,6 +53,41 @@ export function buildRasterMapCells(
   return cells
 }
 
+/** Center point of a sector cell as percentage positions on the map image. */
+export function getSectorMarkerPosition(
+  sectorCode: string,
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+  bounds = RASTER_MAP_GRID_BOUNDS,
+): { left: string, top: string } | null {
+  const parsed = sectorCode.match(/^([A-M])(\d{1,2})$/i)
+  if (!parsed?.[1] || !parsed[2]) {
+    return null
+  }
+
+  const row = parsed[1].toUpperCase()
+  const column = Number(parsed[2])
+  const rowIndex = rows.indexOf(row)
+  const colIndex = columns.indexOf(column)
+
+  if (rowIndex < 0 || colIndex < 0) {
+    return null
+  }
+
+  const gridWidth = bounds.right - bounds.left
+  const gridHeight = bounds.bottom - bounds.top
+  const cellWidth = gridWidth / columns.length
+  const cellHeight = gridHeight / rows.length
+
+  const left = (bounds.left + colIndex * cellWidth + cellWidth / 2) * 100
+  const top = (bounds.top + rowIndex * cellHeight + cellHeight / 2) * 100
+
+  return {
+    left: `${left}%`,
+    top: `${top}%`,
+  }
+}
+
 /** Map a screen tap to a sector code using the transformed stage element bounds. */
 export function pickSectorAtClientPoint(
   clientX: number,

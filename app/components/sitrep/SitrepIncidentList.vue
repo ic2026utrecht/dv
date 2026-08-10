@@ -1,0 +1,232 @@
+<script setup lang="ts">
+import type { Incident, IncidentStatus } from '~/types/models'
+import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
+import type { SitrepSortKey } from '~/utils/sitrepFilters'
+import { getIncidentSeverity, severityDotClass, severityLabel, severityRowBtnClass } from '~/utils/sitrepColors'
+
+const props = defineProps<{
+  incidents: Incident[]
+}>()
+
+const { updateIncident } = useSitrep()
+const { filters, setFilter, filterIncidents } = useSitrepQuery()
+
+const selectedIncident = ref<Incident | null>(null)
+const editDialogOpen = ref(false)
+const saving = ref(false)
+const saveError = ref<string | null>(null)
+
+const filteredIncidents = computed(() => filterIncidents(props.incidents))
+
+const departmentOptions = [
+  { value: 'all', label: 'Alle afdelingen' },
+  ...DEPARTMENTS.map(d => ({ value: d, label: d })),
+]
+
+const priorityOptions = [
+  { value: 'all', label: 'Alle prioriteiten' },
+  ...PRIORITIES.map(p => ({ value: p, label: p })),
+]
+
+const statusOptions = [
+  { value: 'open', label: 'Alleen open' },
+  { value: 'Open', label: 'Open' },
+  { value: 'In behandeling', label: 'In behandeling' },
+  { value: 'Afgesloten', label: 'Afgesloten' },
+  { value: 'all', label: 'Alle statussen' },
+]
+
+const sortOptions: { value: SitrepSortKey, label: string }[] = [
+  { value: 'priority', label: 'Prioriteit' },
+  { value: 'newest', label: 'Nieuwste' },
+  { value: 'oldest', label: 'Oudste' },
+  { value: 'age', label: 'Langst open' },
+]
+
+function formatAge(minutes: number): string {
+  if (minutes < 60) {
+    return `${Math.round(minutes)} min`
+  }
+  const hours = Math.floor(minutes / 60)
+  const mins = Math.round(minutes % 60)
+  return mins > 0 ? `${hours}u ${mins}m` : `${hours}u`
+}
+
+function formatTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) {
+    return timestamp
+  }
+  return date.toLocaleString('nl-NL', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function openIncident(incident: Incident) {
+  selectedIncident.value = incident
+  saveError.value = null
+  editDialogOpen.value = true
+}
+
+async function handleSave(payload: {
+  incidentId: string
+  status: IncidentStatus
+  actionOwner: string
+  updateNotes: string
+}) {
+  saving.value = true
+  saveError.value = null
+
+  try {
+    await updateIncident(payload)
+    editDialogOpen.value = false
+    selectedIncident.value = null
+  }
+  catch (err: unknown) {
+    saveError.value = err instanceof Error ? err.message : 'Opslaan mislukt'
+  }
+  finally {
+    saving.value = false
+  }
+}
+</script>
+
+<template>
+  <section class="ic-sitrep-list ic-sitrep-list--panel">
+    <header class="ic-sitrep-list__header">
+      <h2 class="ic-sitrep-list__title">
+        Incidenten
+      </h2>
+      <span class="ic-sitrep-list__count">{{ filteredIncidents.length }}</span>
+    </header>
+
+    <div class="ic-sitrep-list__controls">
+      <Select
+        :model-value="filters.department"
+        :options="departmentOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="Afdeling"
+        class="ic-sitrep-list__filter"
+        @update:model-value="setFilter('department', $event)"
+      />
+      <Select
+        :model-value="filters.priority"
+        :options="priorityOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="Prioriteit"
+        class="ic-sitrep-list__filter"
+        @update:model-value="setFilter('priority', $event)"
+      />
+      <Select
+        :model-value="filters.status"
+        :options="statusOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="Status"
+        class="ic-sitrep-list__filter"
+        @update:model-value="setFilter('status', $event)"
+      />
+      <Select
+        :model-value="filters.sort"
+        :options="sortOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="Sorteren"
+        class="ic-sitrep-list__filter"
+        @update:model-value="setFilter('sort', $event)"
+      />
+    </div>
+
+    <div class="ic-sitrep-list__scroll">
+      <p v-if="filteredIncidents.length === 0" class="ic-sitrep-list__empty">
+        Geen incidenten voor dit filter
+      </p>
+
+      <ul v-else class="ic-sitrep-list__items">
+        <li
+          v-for="incident in filteredIncidents"
+          :key="incident.incidentId"
+        >
+          <button
+            type="button"
+            :class="severityRowBtnClass(getIncidentSeverity(incident))"
+            @click="openIncident(incident)"
+          >
+            <span :class="severityDotClass(getIncidentSeverity(incident))" aria-hidden="true" />
+            <div class="ic-sitrep-list__body">
+              <div class="ic-sitrep-list__top">
+                <span class="ic-sitrep-list__id">{{ incident.incidentId }}</span>
+                <span class="ic-sitrep-list__badge">{{ severityLabel(getIncidentSeverity(incident)) }}</span>
+              </div>
+              <p class="ic-sitrep-list__type">
+                {{ incident.incidentTypeName }} · {{ incident.department }}
+              </p>
+              <p class="ic-sitrep-list__location">
+                {{ incident.locationName }}
+                <span v-if="incident.sector"> · {{ incident.sector }}</span>
+              </p>
+              <p v-if="incident.description" class="ic-sitrep-list__desc">
+                {{ incident.description }}
+              </p>
+              <div class="ic-sitrep-list__meta">
+                <span>{{ formatTime(incident.timestamp) }}</span>
+                <span v-if="incident.isOpen">{{ formatAge(incident.ageMinutes) }} open</span>
+                <span v-if="incident.actionOwner">Actie: {{ incident.actionOwner }}</span>
+                <span>{{ incident.status || 'Open' }}</span>
+              </div>
+            </div>
+            <i class="pi pi-chevron-right ic-sitrep-row-btn__icon" aria-hidden="true" />
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <Message v-if="saveError" severity="error" class="ic-sitrep-list__error">
+      {{ saveError }}
+    </Message>
+
+    <SitrepIncidentEditDialog
+      v-model="editDialogOpen"
+      :incident="selectedIncident"
+      :saving="saving"
+      @save="handleSave"
+    />
+  </section>
+</template>
+
+<style scoped>
+.ic-sitrep-list--panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ic-sitrep-list__header {
+  flex-shrink: 0;
+}
+
+.ic-sitrep-list__controls {
+  flex-shrink: 0;
+}
+
+.ic-sitrep-list__scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ic-sitrep-list__error {
+  flex-shrink: 0;
+}
+</style>

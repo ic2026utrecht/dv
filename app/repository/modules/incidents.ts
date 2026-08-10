@@ -1,5 +1,6 @@
-import type { SubmitIncidentResponse, ConfigResponse } from '~/types/api'
-import type { IncidentSubmission } from '~/types/models'
+import type { ConfigResponse, SubmitIncidentResponse, IncidentsResponse, UpdateIncidentResponse } from '~/types/api'
+import type { IncidentSubmission, IncidentUpdate } from '~/types/models'
+import { fetchSheetsConfig, postSheetsIncident, fetchSheetsIncidents, postSheetsIncidentUpdate } from '~/utils/sheetsApi'
 
 class IncidentsModule {
   private baseURL: string
@@ -14,6 +15,14 @@ class IncidentsModule {
 
   async submit(payload: IncidentSubmission): Promise<SubmitIncidentResponse> {
     return await postSheetsIncident(this.baseURL, payload)
+  }
+
+  async list(): Promise<IncidentsResponse> {
+    return await fetchSheetsIncidents(this.baseURL)
+  }
+
+  async update(payload: IncidentUpdate): Promise<UpdateIncidentResponse> {
+    return await postSheetsIncidentUpdate(this.baseURL, payload)
   }
 }
 

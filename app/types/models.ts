@@ -31,6 +31,40 @@ export interface RasterConfig {
   columns: number[]
 }
 
+export type IncidentStatus = 'Open' | 'In behandeling' | 'Afgesloten' | string
+
+export interface Incident {
+  incidentId: string
+  timestamp: string
+  department: Department
+  locationName: string
+  zone: string
+  sector: string
+  incidentTypeName: string
+  description: string
+  helpDeployed: string
+  priority: Priority
+  priorityRank: number
+  reporter: string
+  status: IncidentStatus
+  actionOwner: string
+  deadline: string
+  isOpen: boolean
+  ageMinutes: number
+  sourceRow: string
+  latitude: number | null
+  longitude: number | null
+}
+
+export interface SitrepSummary {
+  total: number
+  open: number
+  closed: number
+  criticalOpen: number
+  hoogOpen: number
+  byDepartment: Record<Department, number>
+}
+
 export interface IncidentConfig {
   departments: SelectOption[]
   priorities: SelectOption[]
@@ -39,6 +73,8 @@ export interface IncidentConfig {
   helpOptions: HelpOption[]
   raster: RasterConfig
   personsCountOptions: SelectOption[]
+  supportedActions?: string[]
+  apiVersion?: number
 }
 
 export interface IncidentSubmission {
@@ -60,6 +96,21 @@ export interface IncidentSubmission {
 export interface IncidentSubmissionResult {
   incidentId: string
   timestamp: string
+}
+
+export interface IncidentUpdate {
+  incidentId: string
+  status: IncidentStatus
+  actionOwner?: string
+  updateNotes?: string
+  closedBy?: string
+  closureResult?: string
+}
+
+export interface IncidentUpdateResult {
+  incidentId: string
+  status: IncidentStatus
+  updatedAt: string
 }
 
 export interface ApiResponse<T> {

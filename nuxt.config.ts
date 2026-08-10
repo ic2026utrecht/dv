@@ -49,7 +49,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     prerender: {
-      routes: ['/kaart'],
+      routes: ['/kaart', '/sitrep'],
     },
   },
   tailwindcss: {
