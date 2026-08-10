@@ -5,7 +5,7 @@ export type SitrepDepartmentFilter = 'all' | Department
 export type SitrepPriorityFilter = 'all' | Priority
 export type SitrepStatusFilter = 'open' | 'all' | 'Open' | 'In behandeling' | 'Afgesloten'
 export type SitrepSortKey = 'priority' | 'newest' | 'oldest' | 'age'
-export type SitrepView = 'map' | 'timeline'
+export type SitrepView = 'map' | 'timeline' | 'analytics'
 
 export interface SitrepListFilters {
   department: SitrepDepartmentFilter
@@ -66,7 +66,14 @@ export function parseSitrepFiltersFromQuery(
 export function parseSitrepViewFromQuery(
   query: Record<string, string | string[] | null | undefined>,
 ): SitrepView {
-  return queryValue(query.view) === 'timeline' ? 'timeline' : 'map'
+  const value = queryValue(query.view)
+  if (value === 'timeline') {
+    return 'timeline'
+  }
+  if (value === 'analytics') {
+    return 'analytics'
+  }
+  return 'map'
 }
 
 export function buildSitrepQuery(

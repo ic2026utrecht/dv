@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import type { Incident } from '~/types/models'
 import type { SitrepView } from '~/utils/sitrepFilters'
 
-const props = defineProps<{
-  incidents: Incident[]
-}>()
-
+const { incidents } = useSitrep()
 const { view, setView, filterIncidents } = useSitrepQuery()
 
 const activeTab = computed({
@@ -13,7 +9,8 @@ const activeTab = computed({
   set: (value: SitrepView) => setView(value),
 })
 
-const filteredIncidents = computed(() => filterIncidents(props.incidents))
+const filteredIncidents = computed(() => filterIncidents(incidents.value))
+const openCount = computed(() => incidents.value.filter(i => i.isOpen).length)
 </script>
 
 <template>
@@ -30,13 +27,29 @@ const filteredIncidents = computed(() => filterIncidents(props.incidents))
           Tijdlijn
           <span class="ic-sitrep-tabs__badge">{{ filteredIncidents.length }}</span>
         </Tab>
+        <Tab value="analytics">
+          <i class="pi pi-chart-bar mr-1.5" aria-hidden="true" />
+          Statistieken
+          <span class="ic-sitrep-tabs__badge">{{ openCount }}</span>
+        </Tab>
       </TabList>
-      <TabPanels>
+      <TabPanels :lazy="false">
         <TabPanel value="map">
           <SitrepMap :incidents="incidents" />
         </TabPanel>
         <TabPanel value="timeline">
           <SitrepTimeline :incidents="filteredIncidents" embedded />
+        </TabPanel>
+        <TabPanel value="analytics">
+          <ClientOnly>
+            <SitrepAnalyticsDashboard />
+            <template #fallback>
+              <div class="ic-sitrep-analytics-fallback">
+                <ProgressSpinner style="width: 2rem; height: 2rem" />
+                <p>Statistieken laden…</p>
+              </div>
+            </template>
+          </ClientOnly>
         </TabPanel>
       </TabPanels>
     </Tabs>
@@ -117,5 +130,17 @@ const filteredIncidents = computed(() => filterIncidents(props.incidents))
 .ic-sitrep-tabs :deep(.p-tab.p-tab-active) .ic-sitrep-tabs__badge {
   background: var(--ic-brand);
   color: #fff;
+}
+
+.ic-sitrep-analytics-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 12rem;
+  color: var(--ic-brand);
+  font-size: 0.8125rem;
 }
 </style>

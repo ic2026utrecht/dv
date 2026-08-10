@@ -4,11 +4,7 @@ import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
 import type { SitrepSortKey } from '~/utils/sitrepFilters'
 import { getIncidentSeverity, severityDotClass, severityLabel, severityRowBtnClass } from '~/utils/sitrepColors'
 
-const props = defineProps<{
-  incidents: Incident[]
-}>()
-
-const { updateIncident } = useSitrep()
+const { incidents, updateIncident } = useSitrep()
 const { filters, setFilter, filterIncidents } = useSitrepQuery()
 
 const selectedIncident = ref<Incident | null>(null)
@@ -16,7 +12,7 @@ const editDialogOpen = ref(false)
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 
-const filteredIncidents = computed(() => filterIncidents(props.incidents))
+const filteredIncidents = computed(() => filterIncidents(incidents.value))
 
 const departmentOptions = [
   { value: 'all', label: 'Alle afdelingen' },

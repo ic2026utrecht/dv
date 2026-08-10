@@ -9,7 +9,6 @@ const {
   error,
   lastUpdated,
   summary,
-  incidents,
   fetchIncidents,
   refreshIncidents,
   startPolling,
@@ -22,15 +21,15 @@ const canUpdateIncidents = computed(() => supportsIncidentUpdate(apiConfig.value
 
 const createDialogOpen = ref(false)
 
-onMounted(async () => {
-  try {
-    apiConfig.value = await fetchConfig()
-    await fetchIncidents()
-    startPolling()
-  }
-  catch {
-    // error state shown in template
-  }
+onMounted(() => {
+  fetchConfig()
+    .then((config) => {
+      apiConfig.value = config
+    })
+    .catch(() => {})
+
+  fetchIncidents().catch(() => {})
+  startPolling()
 })
 
 async function refresh() {
@@ -74,25 +73,19 @@ onBeforeUnmount(() => {
         <strong>Deploy → Manage deployments → Edit → New version → Deploy</strong>.
       </Message>
 
-      <div v-if="loading && !lastUpdated" class="ic-sitrep-loading">
-        <ProgressSpinner style="width: 2.5rem; height: 2.5rem" />
-        <p>Incidenten laden…</p>
+      <SitrepKpiCards
+        :summary="summary"
+        :last-updated="lastUpdated"
+        :loading="loading"
+        :refreshing="refreshing"
+        @create="createDialogOpen = true"
+        @refresh="refresh"
+      />
+
+      <div class="ic-sitrep-split">
+        <SitrepMainTabs />
+        <SitrepIncidentList />
       </div>
-
-      <template v-else>
-        <SitrepKpiCards
-          :summary="summary"
-          :last-updated="lastUpdated"
-          :refreshing="refreshing"
-          @create="createDialogOpen = true"
-          @refresh="refresh"
-        />
-
-        <div class="ic-sitrep-split">
-          <SitrepMainTabs :incidents="incidents" />
-          <SitrepIncidentList :incidents="incidents" />
-        </div>
-      </template>
     </div>
 
     <SitrepIncidentCreateDialog
@@ -105,14 +98,5 @@ onBeforeUnmount(() => {
 <style scoped>
 .ic-sitrep-error {
   margin: 1rem;
-}
-
-.ic-sitrep-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 3rem 1rem;
-  color: var(--ic-brand);
 }
 </style>

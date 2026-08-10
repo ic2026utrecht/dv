@@ -4,6 +4,7 @@ import type { SitrepSummary } from '~/types/models'
 defineProps<{
   summary: SitrepSummary
   lastUpdated: Date | null
+  loading?: boolean
   refreshing?: boolean
 }>()
 
@@ -42,6 +43,10 @@ const chips = [
       <p v-if="lastUpdated" class="ic-sitrep-kpis__updated">
         {{ lastUpdated.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) }}
       </p>
+      <p v-else-if="loading" class="ic-sitrep-kpis__updated ic-sitrep-kpis__updated--loading">
+        <i class="pi pi-spin pi-spinner" aria-hidden="true" />
+        Laden…
+      </p>
     </div>
 
     <div class="ic-sitrep-kpis__actions">
@@ -56,10 +61,10 @@ const chips = [
       <button
         type="button"
         class="ic-sitrep-kpis__refresh"
-        :disabled="refreshing"
+        :disabled="refreshing || loading"
         @click="emit('refresh')"
       >
-        <i class="pi pi-refresh" :class="{ 'pi-spin': refreshing }" aria-hidden="true" />
+        <i class="pi pi-refresh" :class="{ 'pi-spin': refreshing || loading }" aria-hidden="true" />
         Vernieuwen
       </button>
     </div>
@@ -141,6 +146,13 @@ const chips = [
   color: #94a3b8;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.ic-sitrep-kpis__updated--loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--ic-brand);
 }
 
 .ic-sitrep-kpis__actions {
