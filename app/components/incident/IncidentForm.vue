@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import type { Department, Priority } from '~/types/models'
 
+const props = withDefaults(defineProps<{
+  inDialog?: boolean
+}>(), {
+  inDialog: false,
+})
+
 const emit = defineEmits<{
   submitted: [incidentId: string]
 }>()
@@ -143,7 +149,7 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="ic-form">
+  <div class="ic-form" :class="{ 'ic-form--dialog': props.inDialog }">
     <div v-if="!isLoaded && loading" class="px-5 py-10 sm:px-8">
       <Message severity="info" :closable="false" class="w-full">
         <span class="font-semibold">Configuratie laden…</span>
@@ -412,7 +418,7 @@ async function onSubmit() {
       </div>
 
       <!-- Sticky submit -->
-      <div class="ic-submit-bar">
+      <div class="ic-submit-bar" :class="{ 'ic-submit-bar--dialog': props.inDialog }">
         <div class="ic-submit-inner">
           <p class="text-center text-sm font-semibold" :class="canSubmit ? 'text-[var(--ic-brand)]' : 'text-slate-600'">
             {{ canSubmit ? 'Klaar om te versturen' : 'Vul alle verplichte velden in' }}

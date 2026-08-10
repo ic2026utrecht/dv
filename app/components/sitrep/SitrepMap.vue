@@ -243,7 +243,7 @@ function formatTime(timestamp: string): string {
   min-height: 0;
   overflow: hidden;
   border-top: 1px solid rgb(135 161 198 / 0.2);
-  background: var(--ic-brand-dark);
+  background: #fff;
 }
 
 .ic-sitrep-map__viewport {
@@ -276,6 +276,7 @@ function formatTime(timestamp: string): string {
   height: auto;
   max-width: none;
   pointer-events: none;
+  opacity: 0.7;
 }
 
 .ic-sitrep-map__markers {

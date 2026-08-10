@@ -96,50 +96,51 @@ async function handleSave(payload: {
 
 <template>
   <section class="ic-sitrep-list ic-sitrep-list--panel">
-    <header class="ic-sitrep-list__header">
-      <h2 class="ic-sitrep-list__title">
-        Incidenten
-      </h2>
-      <span class="ic-sitrep-list__count">{{ filteredIncidents.length }}</span>
-    </header>
-
     <div class="ic-sitrep-list__controls">
-      <Select
-        :model-value="filters.department"
-        :options="departmentOptions"
-        option-label="label"
-        option-value="value"
-        placeholder="Afdeling"
-        class="ic-sitrep-list__filter"
-        @update:model-value="setFilter('department', $event)"
-      />
-      <Select
-        :model-value="filters.priority"
-        :options="priorityOptions"
-        option-label="label"
-        option-value="value"
-        placeholder="Prioriteit"
-        class="ic-sitrep-list__filter"
-        @update:model-value="setFilter('priority', $event)"
-      />
-      <Select
-        :model-value="filters.status"
-        :options="statusOptions"
-        option-label="label"
-        option-value="value"
-        placeholder="Status"
-        class="ic-sitrep-list__filter"
-        @update:model-value="setFilter('status', $event)"
-      />
-      <Select
-        :model-value="filters.sort"
-        :options="sortOptions"
-        option-label="label"
-        option-value="value"
-        placeholder="Sorteren"
-        class="ic-sitrep-list__filter"
-        @update:model-value="setFilter('sort', $event)"
-      />
+      <IcFormField label="Afdeling" html-for="sitrep-filter-department">
+        <Select
+          id="sitrep-filter-department"
+          :model-value="filters.department"
+          :options="departmentOptions"
+          option-label="label"
+          option-value="value"
+          class="ic-sitrep-list__filter"
+          @update:model-value="setFilter('department', $event)"
+        />
+      </IcFormField>
+      <IcFormField label="Prioriteit" html-for="sitrep-filter-priority">
+        <Select
+          id="sitrep-filter-priority"
+          :model-value="filters.priority"
+          :options="priorityOptions"
+          option-label="label"
+          option-value="value"
+          class="ic-sitrep-list__filter"
+          @update:model-value="setFilter('priority', $event)"
+        />
+      </IcFormField>
+      <IcFormField label="Status" html-for="sitrep-filter-status">
+        <Select
+          id="sitrep-filter-status"
+          :model-value="filters.status"
+          :options="statusOptions"
+          option-label="label"
+          option-value="value"
+          class="ic-sitrep-list__filter"
+          @update:model-value="setFilter('status', $event)"
+        />
+      </IcFormField>
+      <IcFormField label="Sorteren" html-for="sitrep-filter-sort">
+        <Select
+          id="sitrep-filter-sort"
+          :model-value="filters.sort"
+          :options="sortOptions"
+          option-label="label"
+          option-value="value"
+          class="ic-sitrep-list__filter"
+          @update:model-value="setFilter('sort', $event)"
+        />
+      </IcFormField>
     </div>
 
     <div class="ic-sitrep-list__scroll">
@@ -207,10 +208,6 @@ async function handleSave(payload: {
   max-height: 100%;
   min-height: 0;
   overflow: hidden;
-}
-
-.ic-sitrep-list__header {
-  flex-shrink: 0;
 }
 
 .ic-sitrep-list__controls {

@@ -20,6 +20,8 @@ const { fetchConfig } = useIncidents()
 const apiConfig = ref<Awaited<ReturnType<typeof fetchConfig>> | null>(null)
 const canUpdateIncidents = computed(() => supportsIncidentUpdate(apiConfig.value))
 
+const createDialogOpen = ref(false)
+
 onMounted(async () => {
   try {
     apiConfig.value = await fetchConfig()
@@ -40,6 +42,10 @@ async function refresh() {
   }
 }
 
+async function onIncidentCreated() {
+  await refresh()
+}
+
 onBeforeUnmount(() => {
   stopPolling()
 })
@@ -52,22 +58,6 @@ onBeforeUnmount(() => {
         title="Sitrep dashboard"
         subtitle="Live overzicht van open incidenten op de congreslocatie"
       />
-
-      <div class="ic-sitrep-toolbar">
-        <NuxtLink to="/" class="ic-sitrep-link">
-          <i class="pi pi-plus" aria-hidden="true" />
-          Nieuwe melding
-        </NuxtLink>
-        <button
-          type="button"
-          class="ic-sitrep-refresh"
-          :disabled="refreshing"
-          @click="refresh"
-        >
-          <i class="pi pi-refresh" :class="{ 'pi-spin': refreshing }" aria-hidden="true" />
-          Vernieuwen
-        </button>
-      </div>
 
       <Message v-if="error" severity="error" class="ic-sitrep-error">
         {{ error }}
@@ -90,7 +80,13 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-else>
-        <SitrepKpiCards :summary="summary" :last-updated="lastUpdated" />
+        <SitrepKpiCards
+          :summary="summary"
+          :last-updated="lastUpdated"
+          :refreshing="refreshing"
+          @create="createDialogOpen = true"
+          @refresh="refresh"
+        />
 
         <div class="ic-sitrep-split">
           <SitrepMainTabs :incidents="incidents" />
@@ -98,58 +94,15 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </div>
+
+    <SitrepIncidentCreateDialog
+      v-model="createDialogOpen"
+      @created="onIncidentCreated"
+    />
   </div>
 </template>
 
 <style scoped>
-.ic-sitrep-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgb(135 161 198 / 0.25);
-  background: var(--ic-surface);
-}
-
-.ic-sitrep-link,
-.ic-sitrep-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 0.875rem;
-  border-radius: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.ic-sitrep-link {
-  background: var(--ic-brand);
-  color: #fff;
-  text-decoration: none;
-}
-
-.ic-sitrep-link:hover {
-  background: var(--ic-brand-dark);
-}
-
-.ic-sitrep-refresh {
-  border: 1px solid rgb(135 161 198 / 0.55);
-  background: #fff;
-  color: var(--ic-brand);
-}
-
-.ic-sitrep-refresh:hover:not(:disabled) {
-  background: rgb(135 161 198 / 0.12);
-}
-
-.ic-sitrep-refresh:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .ic-sitrep-error {
   margin: 1rem;
 }
