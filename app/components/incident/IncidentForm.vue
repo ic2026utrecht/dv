@@ -245,7 +245,11 @@ async function onSubmit() {
               Rasterkaart openen
             </button>
 
-            <RasterMapDialog v-model="rasterMapOpen" />
+            <RasterMapDialog
+              v-model="rasterMapOpen"
+              :selected-sector="sectorCode"
+              @select="sectorCode = $event"
+            />
 
             <IcFormField
               label="Prioriteit"

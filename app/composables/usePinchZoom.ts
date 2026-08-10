@@ -14,6 +14,11 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   let panOriginY = 0
   let isPanning = false
   let activePointerId: number | null = null
+  let touchMoved = false
+
+  function isCellTarget(target: EventTarget | null) {
+    return target instanceof Element && Boolean(target.closest('.ic-raster-cell'))
+  }
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value))
@@ -25,6 +30,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
     translateY.value = 0
     isPanning = false
     activePointerId = null
+    touchMoved = false
   }
 
   function normalizeScale() {
@@ -43,10 +49,16 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   }
 
   function onTouchStart(event: TouchEvent) {
+    touchMoved = false
+
     if (event.touches.length === 2) {
       isPanning = false
       pinchStartDistance = getTouchDistance(event.touches)
       pinchStartScale = scale.value
+      return
+    }
+
+    if (isCellTarget(event.target)) {
       return
     }
 
@@ -62,6 +74,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   function onTouchMove(event: TouchEvent) {
     if (event.touches.length === 2) {
       event.preventDefault()
+      touchMoved = true
       const distance = getTouchDistance(event.touches)
       scale.value = clamp(pinchStartScale * (distance / pinchStartDistance), minScale, maxScale)
       return
@@ -69,8 +82,13 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
 
     if (event.touches.length === 1 && isPanning) {
       event.preventDefault()
-      translateX.value = panOriginX + (event.touches[0]!.clientX - panStartX)
-      translateY.value = panOriginY + (event.touches[0]!.clientY - panStartY)
+      const dx = event.touches[0]!.clientX - panStartX
+      const dy = event.touches[0]!.clientY - panStartY
+      if (Math.hypot(dx, dy) > 6) {
+        touchMoved = true
+      }
+      translateX.value = panOriginX + dx
+      translateY.value = panOriginY + dy
     }
   }
 
@@ -87,7 +105,7 @@ export function usePinchZoom(options?: { minScale?: number, maxScale?: number })
   }
 
   function onPointerDown(event: PointerEvent) {
-    if (event.pointerType === 'touch') {
+    if (event.pointerType === 'touch' || isCellTarget(event.target)) {
       return
     }
 

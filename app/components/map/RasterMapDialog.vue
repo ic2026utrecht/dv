@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import rasterMap from '~/assets/images/raster-map.png'
+import { buildRasterMapCells } from '~/constants/rasterMapGrid'
 
 const visible = defineModel<boolean>({ default: false })
+
+defineProps<{
+  selectedSector?: string | null
+}>()
+
+const emit = defineEmits<{
+  select: [sectorCode: string]
+}>()
+
+const cells = buildRasterMapCells()
 
 const {
   transformStyle,
@@ -23,6 +34,11 @@ watch(visible, (open) => {
 
 function close() {
   visible.value = false
+}
+
+function onCellSelect(code: string) {
+  emit('select', code)
+  close()
 }
 </script>
 
@@ -53,7 +69,7 @@ function close() {
         Rasterkaart · A–M × 1–22
       </p>
       <p class="ic-raster-dialog__hint">
-        Knijp om te zoomen · sleep om te verschuiven
+        Tik op een vak · knijp om te zoomen · sleep om te verschuiven
       </p>
     </div>
 
@@ -69,14 +85,28 @@ function close() {
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
     >
-      <img
-        :src="rasterMap"
-        alt="Rasterkaart IC2026 DV — rijen A tot M, kolommen 1 tot 22"
-        class="ic-raster-dialog__image"
-        :style="transformStyle"
-        decoding="async"
-        draggable="false"
-      >
+      <div class="ic-raster-dialog__stage" :style="transformStyle">
+        <img
+          :src="rasterMap"
+          alt=""
+          class="ic-raster-dialog__image"
+          decoding="async"
+          draggable="false"
+        >
+        <div class="ic-raster-dialog__grid" aria-hidden="true">
+          <button
+            v-for="cell in cells"
+            :key="cell.code"
+            type="button"
+            class="ic-raster-cell"
+            :class="{ 'ic-raster-cell--selected': selectedSector === cell.code }"
+            :style="cell.style"
+            :aria-label="`Sector ${cell.code}`"
+            :title="cell.code"
+            @click.stop="onCellSelect(cell.code)"
+          />
+        </div>
+      </div>
     </div>
   </Dialog>
 </template>
@@ -153,10 +183,20 @@ function close() {
   touch-action: none;
   cursor: grab;
   user-select: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .ic-raster-dialog__viewport:active {
   cursor: grabbing;
+}
+
+.ic-raster-dialog__stage {
+  position: relative;
+  width: 100%;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .ic-raster-dialog__image {
@@ -164,8 +204,37 @@ function close() {
   width: 100%;
   height: auto;
   max-width: none;
-  transform-origin: center center;
-  will-change: transform;
   pointer-events: none;
+}
+
+.ic-raster-dialog__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ic-raster-cell {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(45 46 126 / 0.08);
+  background: rgb(135 161 198 / 0.04);
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.ic-raster-cell:hover,
+.ic-raster-cell:focus-visible {
+  background: rgb(45 46 126 / 0.18);
+  border-color: rgb(45 46 126 / 0.45);
+  outline: none;
+}
+
+.ic-raster-cell--selected {
+  background: rgb(230 151 50 / 0.38) !important;
+  border-color: var(--ic-orange) !important;
+  box-shadow: inset 0 0 0 1px rgb(230 151 50 / 0.55);
 }
 </style>
