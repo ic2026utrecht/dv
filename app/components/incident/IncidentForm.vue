@@ -26,6 +26,7 @@ const ambulanceCalled = ref<'ja' | 'nee' | null>(null)
 
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
+const rasterMapOpen = ref(false)
 
 onMounted(async () => {
   try {
@@ -235,10 +236,16 @@ async function onSubmit() {
               />
             </IcFormField>
 
-            <NuxtLink to="/kaart" class="ic-map-link">
+            <button
+              type="button"
+              class="ic-map-link"
+              @click="rasterMapOpen = true"
+            >
               <i class="pi pi-map" aria-hidden="true" />
               Rasterkaart openen
-            </NuxtLink>
+            </button>
+
+            <RasterMapDialog v-model="rasterMapOpen" />
 
             <IcFormField
               label="Prioriteit"
@@ -397,7 +404,7 @@ async function onSubmit() {
       <!-- Sticky submit -->
       <div class="ic-submit-bar">
         <div class="ic-submit-inner">
-          <p class="text-center text-sm font-semibold" :class="canSubmit ? 'text-green-700' : 'text-slate-600'">
+          <p class="text-center text-sm font-semibold" :class="canSubmit ? 'text-[var(--ic-brand)]' : 'text-slate-600'">
             {{ canSubmit ? 'Klaar om te versturen' : 'Vul alle verplichte velden in' }}
           </p>
           <Button

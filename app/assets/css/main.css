@@ -1,16 +1,23 @@
 :root {
-  --ic-blue: #2563eb;
-  --ic-critical: #dc2626;
-  --ic-high: #ea580c;
-  --ic-medium: #ca8a04;
-  --ic-low: #16a34a;
+  --ic-brand: #2d2e7e;
+  --ic-brand-dark: #2c317b;
+  --ic-accent: #87a1c6;
+  --ic-orange: #e69732;
+  --ic-purple: #70009f;
+  --ic-crimson: #ba3148;
+  --ic-surface: #f4f4f4;
+  --ic-surface-muted: #e8eaf3;
+  --ic-critical: #ba3148;
+  --ic-high: #e69732;
+  --ic-medium: #70009f;
+  --ic-low: #87a1c6;
 }
 
 body {
   @apply antialiased;
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--ic-surface);
+  color: #1a1c4a;
   min-height: 100vh;
 }
 
@@ -19,23 +26,30 @@ body {
 }
 
 .ic-shell {
-  @apply overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg;
+  @apply overflow-hidden rounded-2xl border shadow-lg;
+  border-color: rgb(45 46 126 / 0.12);
+  background: #fff;
 }
 
 .ic-card {
-  @apply rounded-xl border border-slate-300 bg-slate-200/70 p-5;
+  @apply rounded-xl border p-5;
+  border-color: rgb(135 161 198 / 0.45);
+  background: var(--ic-surface-muted);
 }
 
 .ic-card--accent {
-  @apply border-slate-300 bg-slate-200/70;
+  border-color: rgb(135 161 198 / 0.55);
+  background: var(--ic-surface-muted);
 }
 
 .ic-section-title {
-  @apply mb-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500;
+  @apply mb-0.5 text-xs font-semibold uppercase tracking-wide;
+  color: var(--ic-brand);
 }
 
 .ic-section-heading {
-  @apply mb-4 text-base font-semibold text-slate-900;
+  @apply mb-4 text-base font-semibold;
+  color: var(--ic-brand-dark);
 }
 
 .ic-label {
@@ -76,8 +90,8 @@ body {
 
 .ic-form .p-inputtext:enabled:focus,
 .ic-form .p-textarea:enabled:focus {
-  border-color: var(--ic-blue);
-  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14);
+  border-color: var(--ic-brand);
+  box-shadow: 0 0 0 3px rgb(45 46 126 / 0.14);
   outline: none;
 }
 
@@ -105,8 +119,8 @@ body {
 .ic-form .p-multiselect.p-focus,
 .ic-form .p-inputwrapper-focus.p-select,
 .ic-form .p-inputwrapper-focus.p-multiselect {
-  border-color: var(--ic-blue);
-  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14);
+  border-color: var(--ic-brand);
+  box-shadow: 0 0 0 3px rgb(45 46 126 / 0.14);
 }
 
 .ic-form .p-select .p-select-label,
@@ -161,34 +175,34 @@ body {
 }
 
 .ic-choice-btn--selected {
-  border-color: var(--ic-blue);
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--ic-brand);
+  background: rgb(135 161 198 / 0.18);
+  color: var(--ic-brand-dark);
   font-weight: 600;
 }
 
 .ic-choice-btn--critical.ic-choice-btn--selected {
   border-color: var(--ic-critical);
-  background: #fef2f2;
-  color: #b91c1c;
+  background: rgb(186 49 72 / 0.1);
+  color: #9f1239;
 }
 
 .ic-choice-btn--hoog.ic-choice-btn--selected {
   border-color: var(--ic-high);
-  background: #fff7ed;
-  color: #c2410c;
+  background: rgb(230 151 50 / 0.12);
+  color: #b45309;
 }
 
 .ic-choice-btn--middel.ic-choice-btn--selected {
   border-color: var(--ic-medium);
-  background: #fefce8;
-  color: #a16207;
+  background: rgb(112 0 159 / 0.08);
+  color: #6b21a8;
 }
 
 .ic-choice-btn--laag.ic-choice-btn--selected {
-  border-color: var(--ic-low);
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: var(--ic-accent);
+  background: rgb(135 161 198 / 0.22);
+  color: #334155;
 }
 
 /* Department tiles */
@@ -202,7 +216,9 @@ body {
 }
 
 .ic-dept-tile--active {
-  @apply border-blue-600 bg-blue-600 text-white;
+  border-color: var(--ic-brand);
+  background: var(--ic-brand);
+  color: #fff;
 }
 
 .ic-dept-tile--active .ic-dept-icon {
@@ -218,15 +234,20 @@ body {
 }
 
 .ic-sector-banner {
-  @apply flex flex-col gap-3 rounded-lg border border-blue-100 bg-blue-50/80 px-4 py-3;
+  @apply flex flex-col gap-3 rounded-lg px-4 py-3;
+  border: 1px solid rgb(135 161 198 / 0.5);
+  background: rgb(135 161 198 / 0.15);
 }
 
 .ic-sector-code {
-  @apply text-2xl font-bold tracking-tight text-slate-900;
+  @apply text-2xl font-bold tracking-tight;
+  color: var(--ic-brand-dark);
 }
 
 .ic-map-link {
-  @apply inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-slate-50;
+  @apply inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50;
+  border-color: rgb(135 161 198 / 0.55);
+  color: var(--ic-brand);
 }
 
 .ic-submit-bar {
@@ -238,15 +259,34 @@ body {
 }
 
 .ic-step-badge {
-  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white;
+  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white;
+  background: var(--ic-orange);
 }
 
 .ic-header-hero {
-  @apply border-b border-slate-200 bg-slate-900 px-4 py-6 text-white;
+  @apply px-4 py-5 text-white;
+  background: linear-gradient(135deg, var(--ic-brand-dark) 0%, var(--ic-brand) 62%, #3a3f96 100%);
+  border-bottom: 3px solid var(--ic-orange);
+}
+
+.ic-header-brand {
+  @apply flex items-start gap-4;
+}
+
+.ic-header-logo {
+  @apply shrink-0;
+  width: 4.5rem;
+  height: auto;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.18));
+}
+
+.ic-header-copy {
+  @apply min-w-0 flex-1 pt-0.5;
 }
 
 .ic-header-kicker {
-  @apply text-xs font-medium uppercase tracking-wide text-slate-400;
+  @apply text-xs font-semibold uppercase tracking-wide;
+  color: var(--ic-accent);
 }
 
 .ic-header-title {
@@ -254,21 +294,31 @@ body {
 }
 
 .ic-header-sub {
-  @apply mt-2 text-sm leading-relaxed text-slate-400;
+  @apply mt-2 text-sm leading-relaxed;
+  color: rgb(244 244 244 / 0.82);
+}
+
+.ic-header-step {
+  @apply mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold;
+  background: rgb(255 255 255 / 0.1);
+  color: rgb(244 244 244 / 0.95);
 }
 
 .ic-progress {
-  @apply flex gap-1 border-b border-slate-100 bg-slate-50 px-4 py-3;
+  @apply flex gap-1 border-b px-4 py-3;
+  border-color: rgb(135 161 198 / 0.25);
+  background: var(--ic-surface);
 }
 
 .ic-progress-segment {
-  @apply h-1 flex-1 rounded-full bg-slate-200;
+  @apply h-1 flex-1 rounded-full;
+  background: rgb(135 161 198 / 0.35);
 }
 
 .ic-progress-segment--done {
-  @apply bg-blue-600;
+  background: var(--ic-brand);
 }
 
 .ic-progress-segment--active {
-  @apply bg-blue-400;
+  background: var(--ic-orange);
 }

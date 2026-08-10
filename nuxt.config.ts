@@ -1,4 +1,4 @@
-import Aura from '@primeuix/themes/aura'
+import IC2026Preset from './app/theme/ic2026-preset'
 
 const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'ic'
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true'
@@ -36,7 +36,7 @@ export default defineNuxtConfig({
   primevue: {
     options: {
       theme: {
-        preset: Aura,
+        preset: IC2026Preset,
         options: {
           darkModeSelector: '.app-dark',
           cssLayer: {
