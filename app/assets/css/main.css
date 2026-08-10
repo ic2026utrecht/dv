@@ -1,25 +1,274 @@
 :root {
-  --ic-primary: #1a365d;
-  --ic-accent: #2b6cb0;
-  --ic-critical: #9b2c2c;
+  --ic-blue: #2563eb;
+  --ic-critical: #dc2626;
+  --ic-high: #ea580c;
+  --ic-medium: #ca8a04;
+  --ic-low: #16a34a;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
-}
-
-.ic-card {
-  @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  @apply antialiased;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  background: #f1f5f9;
+  color: #0f172a;
+  min-height: 100vh;
 }
 
 .ic-page {
-  @apply mx-auto min-h-screen max-w-3xl px-4 py-8;
+  @apply mx-auto min-h-screen w-full max-w-lg px-4 pb-32 pt-4;
 }
 
-.ic-label {
-  @apply mb-1 block text-sm font-medium text-slate-700;
+.ic-shell {
+  @apply overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg;
+}
+
+.ic-card {
+  @apply rounded-xl border border-slate-300 bg-slate-200/70 p-5;
+}
+
+.ic-card--accent {
+  @apply border-slate-300 bg-slate-200/70;
 }
 
 .ic-section-title {
-  @apply mb-4 text-lg font-semibold text-slate-800;
+  @apply mb-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500;
+}
+
+.ic-section-heading {
+  @apply mb-4 text-base font-semibold text-slate-900;
+}
+
+.ic-label {
+  @apply mb-1.5 block text-sm font-medium text-slate-800;
+}
+
+.ic-label-hint {
+  @apply mb-2 block text-xs text-slate-500;
+}
+
+.ic-required {
+  @apply text-red-500;
+}
+
+.ic-field {
+  width: 100%;
+  max-width: 100%;
+}
+
+/*
+ * Tailwind preflight zeros input/textarea padding. PrimeVue FormField also
+ * shadowed our IcFormField wrapper, so these rules target .ic-form directly.
+ */
+.ic-form .p-inputtext,
+.ic-form .p-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.625rem 0.875rem !important;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: #0f172a;
+  background: #fff;
+  border: 1px solid #94a3b8;
+  border-radius: 0.5rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ic-form .p-inputtext:enabled:focus,
+.ic-form .p-textarea:enabled:focus {
+  border-color: var(--ic-blue);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14);
+  outline: none;
+}
+
+.ic-form .p-inputtext::placeholder,
+.ic-form .p-textarea::placeholder {
+  color: #64748b;
+}
+
+.ic-form .p-select,
+.ic-form .p-multiselect {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid #94a3b8;
+  border-radius: 0.5rem;
+}
+
+.ic-form .p-select:not(.p-disabled):hover,
+.ic-form .p-multiselect:not(.p-disabled):hover {
+  border-color: #64748b;
+}
+
+.ic-form .p-select.p-focus,
+.ic-form .p-multiselect.p-focus,
+.ic-form .p-inputwrapper-focus.p-select,
+.ic-form .p-inputwrapper-focus.p-multiselect {
+  border-color: var(--ic-blue);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14);
+}
+
+.ic-form .p-select .p-select-label,
+.ic-form .p-multiselect .p-multiselect-label {
+  padding: 0.625rem 0.875rem;
+  color: #0f172a;
+}
+
+.ic-form .p-select input.p-select-label {
+  padding: 0.625rem 0.875rem !important;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+}
+
+.ic-form .p-select-label.p-placeholder,
+.ic-form .p-multiselect-label.p-placeholder {
+  color: #64748b;
+}
+
+/* Choice buttons (custom — not PrimeVue SelectButton) */
+.ic-choice-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .ic-choice-row--priority {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.ic-choice-btn {
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ic-choice-btn--selected {
+  border-color: var(--ic-blue);
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.ic-choice-btn--critical.ic-choice-btn--selected {
+  border-color: var(--ic-critical);
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.ic-choice-btn--hoog.ic-choice-btn--selected {
+  border-color: var(--ic-high);
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.ic-choice-btn--middel.ic-choice-btn--selected {
+  border-color: var(--ic-medium);
+  background: #fefce8;
+  color: #a16207;
+}
+
+.ic-choice-btn--laag.ic-choice-btn--selected {
+  border-color: var(--ic-low);
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+/* Department tiles */
+.ic-dept-grid {
+  @apply grid grid-cols-1 gap-2;
+}
+
+.ic-dept-tile {
+  @apply flex min-h-[3.5rem] flex-row items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition-colors;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ic-dept-tile--active {
+  @apply border-blue-600 bg-blue-600 text-white;
+}
+
+.ic-dept-tile--active .ic-dept-icon {
+  @apply bg-white/15 text-white;
+}
+
+.ic-dept-icon {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-lg text-slate-600;
+}
+
+.ic-dept-label {
+  @apply text-sm font-semibold;
+}
+
+.ic-sector-banner {
+  @apply flex flex-col gap-3 rounded-lg border border-blue-100 bg-blue-50/80 px-4 py-3;
+}
+
+.ic-sector-code {
+  @apply text-2xl font-bold tracking-tight text-slate-900;
+}
+
+.ic-map-link {
+  @apply inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-slate-50;
+}
+
+.ic-submit-bar {
+  @apply fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur;
+}
+
+.ic-submit-inner {
+  @apply mx-auto flex w-full max-w-lg flex-col gap-2;
+}
+
+.ic-step-badge {
+  @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white;
+}
+
+.ic-header-hero {
+  @apply border-b border-slate-200 bg-slate-900 px-4 py-6 text-white;
+}
+
+.ic-header-kicker {
+  @apply text-xs font-medium uppercase tracking-wide text-slate-400;
+}
+
+.ic-header-title {
+  @apply mt-1 text-xl font-semibold leading-tight;
+}
+
+.ic-header-sub {
+  @apply mt-2 text-sm leading-relaxed text-slate-400;
+}
+
+.ic-progress {
+  @apply flex gap-1 border-b border-slate-100 bg-slate-50 px-4 py-3;
+}
+
+.ic-progress-segment {
+  @apply h-1 flex-1 rounded-full bg-slate-200;
+}
+
+.ic-progress-segment--done {
+  @apply bg-blue-600;
+}
+
+.ic-progress-segment--active {
+  @apply bg-blue-400;
 }

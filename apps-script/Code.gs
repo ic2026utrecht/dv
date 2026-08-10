@@ -180,7 +180,8 @@ function syncIncidentsFromResponses() {
   ensureUniqueIncidentIds_(outRows);
 
   if (incidents.getLastRow() > 1) {
-    incidents.getRange(2, 1, incidents.getLastRow(), INCIDENT_HEADERS.length).clearContent();
+    var clearRows = incidents.getLastRow() - 1;
+    incidents.getRange(2, 1, clearRows, INCIDENT_HEADERS.length).clearContent();
   }
   if (outRows.length) {
     incidents.getRange(2, 1, outRows.length, INCIDENT_HEADERS.length).setValues(outRows);
@@ -370,7 +371,7 @@ function loadIncidentsBySourceRow_(sheet) {
   var map = {};
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return map;
-  var data = sheet.getRange(2, 1, lastRow, INCIDENT_HEADERS.length).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, INCIDENT_HEADERS.length).getValues();
   for (var i = 0; i < data.length; i++) {
     var sourceRow = data[i][20];
     if (!sourceRow) continue;

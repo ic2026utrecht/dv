@@ -8,9 +8,12 @@ function onSubmitted(incidentId: string) {
 
 <template>
   <div class="ic-page">
-    <LayoutPageHeader
-      subtitle="Parkeer · Dienstverlening · EHBO — data wordt opgeslagen in Google Sheets"
-    />
-    <IncidentForm @submitted="onSubmitted" />
+    <div class="ic-shell">
+      <LayoutPageHeader
+        subtitle="Melding gaat direct naar het Sitrep-overzicht in Google Sheets"
+        :step="1"
+      />
+      <IncidentForm @submitted="onSubmitted" />
+    </div>
   </div>
 </template>

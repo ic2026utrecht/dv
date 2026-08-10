@@ -14,6 +14,12 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'Incident registratie IC2026 DV' },
       ],
+      link: [
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40;700&display=swap',
+        },
+      ],
     },
   },
   srcDir: 'app/',
@@ -39,6 +45,11 @@ export default defineNuxtConfig({
           },
         },
       },
+    },
+  },
+  nitro: {
+    prerender: {
+      routes: ['/kaart'],
     },
   },
   tailwindcss: {

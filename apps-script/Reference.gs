@@ -55,7 +55,7 @@ function buildReferenceSheet_(ss) {
     ['P4'],
     ['AXA/Overig']
   ];
-  sheet.getRange(2, 7, locaties.length + 1, 7).setValues(locaties);
+  sheet.getRange(2, 7, locaties.length, 1).setValues(locaties);
 
   // --- Sectoren per locatie (I1:J…) ---
   sheet.getRange('I1').setValue('Locatie').setFontWeight('bold');
@@ -82,7 +82,7 @@ function buildReferenceSheet_(ss) {
     ['P4', 'P4 algemeen'],
     ['AXA/Overig', 'Overig']
   ];
-  sheet.getRange(2, 9, sectoren.length + 1, 10).setValues(sectoren);
+  sheet.getRange(2, 9, sectoren.length, 2).setValues(sectoren);
 
   // --- Incident types Parkeer (L) ---
   sheet.getRange('L1').setValue('Incidenttypen_Parkeer').setFontWeight('bold');
@@ -94,7 +94,7 @@ function buildReferenceSheet_(ss) {
     ['Materieel'],
     ['Overig']
   ];
-  sheet.getRange(2, 12, parkTypes.length + 1, 12).setValues(parkTypes);
+  sheet.getRange(2, 12, parkTypes.length, 1).setValues(parkTypes);
 
   // --- Incident types DV (N) ---
   sheet.getRange('N1').setValue('Incidenttypen_DV').setFontWeight('bold');
@@ -112,7 +112,7 @@ function buildReferenceSheet_(ss) {
     ['Technisch (niet-medisch)'],
     ['Niet-Medisch Algemeen']
   ];
-  sheet.getRange(2, 14, dvTypes.length + 1, 14).setValues(dvTypes);
+  sheet.getRange(2, 14, dvTypes.length, 1).setValues(dvTypes);
 
   // --- Incident types EHBO (P) ---
   sheet.getRange('P1').setValue('Incidenttypen_EHBO').setFontWeight('bold');
@@ -123,7 +123,7 @@ function buildReferenceSheet_(ss) {
     ['Meerdere slachtoffers'],
     ['Overig medisch']
   ];
-  sheet.getRange(2, 16, ehboTypes.length + 1, 16).setValues(ehboTypes);
+  sheet.getRange(2, 16, ehboTypes.length, 1).setValues(ehboTypes);
 
   // --- Hulp options (R:S) name + departments ---
   sheet.getRange('R1').setValue('Hulp_opties').setFontWeight('bold');
@@ -135,7 +135,7 @@ function buildReferenceSheet_(ss) {
     ['Afd. HC Safety gebeld', 'Parkeer,Dienstverlening,EHBO'],
     ['Reiniging of installatie gebeld', 'Parkeer,Dienstverlening']
   ];
-  sheet.getRange(2, 18, hulp.length + 1, 19).setValues(hulp);
+  sheet.getRange(2, 18, hulp.length, 2).setValues(hulp);
 
   // --- Sitrep period options (T) ---
   sheet.getRange('T1').setValue('Sitrep_periode').setFontWeight('bold');

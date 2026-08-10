@@ -12,15 +12,29 @@ var API_CONFIG = {
 };
 
 function doGet(e) {
+  var callback = e && e.parameter && e.parameter.callback;
   try {
     var action = (e && e.parameter && e.parameter.action) || 'config';
+
     if (action === 'config') {
-      return jsonResponse_({ data: getIncidentConfig_() });
+      return respond_(callback, { data: getIncidentConfig_() });
     }
-    return jsonResponse_({ error: 'Unknown action' }, 400);
+    return respond_(callback, { error: 'Unknown action' });
   } catch (err) {
-    return jsonResponse_({ error: String(err.message || err) }, 500);
+    return respond_(callback, { error: String(err.message || err) });
   }
+}
+
+/**
+ * JSON for direct browser navigation; JSONP for cross-origin fetch from the web app.
+ */
+function respond_(callback, payload) {
+  var json = JSON.stringify(payload);
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonResponse_(payload);
 }
 
 function doPost(e) {
@@ -173,7 +187,8 @@ function validateSubmission_(body) {
 function readLocations_(ss) {
   var sheet = ss.getSheetByName(API_CONFIG.LOCATIONS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var data = sheet.getRange(2, 1, sheet.getLastRow(), 4).getValues();
+  var numRows = sheet.getLastRow() - 1;
+  var data = sheet.getRange(2, 1, numRows, 4).getValues();
   return data.map(function (row) {
     return {
       id: String(row[0] || '').trim(),
@@ -293,7 +308,7 @@ function nextIncidentId_(incidentsSheet) {
   var lastRow = incidentsSheet.getLastRow();
   var maxNum = 0;
   if (lastRow >= 2) {
-    var ids = incidentsSheet.getRange(2, 1, lastRow, 1).getValues();
+    var ids = incidentsSheet.getRange(2, 1, lastRow - 1, 1).getValues();
     ids.forEach(function (row) {
       var num = parseInt(String(row[0]).replace(/\D/g, ''), 10);
       if (!isNaN(num) && num > maxNum) maxNum = num;

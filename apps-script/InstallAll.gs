@@ -180,7 +180,8 @@ function syncIncidentsFromResponses() {
   ensureUniqueIncidentIds_(outRows);
 
   if (incidents.getLastRow() > 1) {
-    incidents.getRange(2, 1, incidents.getLastRow(), INCIDENT_HEADERS.length).clearContent();
+    var clearRows = incidents.getLastRow() - 1;
+    incidents.getRange(2, 1, clearRows, INCIDENT_HEADERS.length).clearContent();
   }
   if (outRows.length) {
     incidents.getRange(2, 1, outRows.length, INCIDENT_HEADERS.length).setValues(outRows);
@@ -370,7 +371,7 @@ function loadIncidentsBySourceRow_(sheet) {
   var map = {};
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return map;
-  var data = sheet.getRange(2, 1, lastRow, INCIDENT_HEADERS.length).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, INCIDENT_HEADERS.length).getValues();
   for (var i = 0; i < data.length; i++) {
     var sourceRow = data[i][20];
     if (!sourceRow) continue;
@@ -506,7 +507,7 @@ function buildReferenceSheet_(ss) {
     ['P4'],
     ['AXA/Overig']
   ];
-  sheet.getRange(2, 7, locaties.length + 1, 7).setValues(locaties);
+  sheet.getRange(2, 7, locaties.length, 1).setValues(locaties);
 
   // --- Sectoren per locatie (I1:J…) ---
   sheet.getRange('I1').setValue('Locatie').setFontWeight('bold');
@@ -533,7 +534,7 @@ function buildReferenceSheet_(ss) {
     ['P4', 'P4 algemeen'],
     ['AXA/Overig', 'Overig']
   ];
-  sheet.getRange(2, 9, sectoren.length + 1, 10).setValues(sectoren);
+  sheet.getRange(2, 9, sectoren.length, 2).setValues(sectoren);
 
   // --- Incident types Parkeer (L) ---
   sheet.getRange('L1').setValue('Incidenttypen_Parkeer').setFontWeight('bold');
@@ -545,7 +546,7 @@ function buildReferenceSheet_(ss) {
     ['Materieel'],
     ['Overig']
   ];
-  sheet.getRange(2, 12, parkTypes.length + 1, 12).setValues(parkTypes);
+  sheet.getRange(2, 12, parkTypes.length, 1).setValues(parkTypes);
 
   // --- Incident types DV (N) ---
   sheet.getRange('N1').setValue('Incidenttypen_DV').setFontWeight('bold');
@@ -563,7 +564,7 @@ function buildReferenceSheet_(ss) {
     ['Technisch (niet-medisch)'],
     ['Niet-Medisch Algemeen']
   ];
-  sheet.getRange(2, 14, dvTypes.length + 1, 14).setValues(dvTypes);
+  sheet.getRange(2, 14, dvTypes.length, 1).setValues(dvTypes);
 
   // --- Incident types EHBO (P) ---
   sheet.getRange('P1').setValue('Incidenttypen_EHBO').setFontWeight('bold');
@@ -574,7 +575,7 @@ function buildReferenceSheet_(ss) {
     ['Meerdere slachtoffers'],
     ['Overig medisch']
   ];
-  sheet.getRange(2, 16, ehboTypes.length + 1, 16).setValues(ehboTypes);
+  sheet.getRange(2, 16, ehboTypes.length, 1).setValues(ehboTypes);
 
   // --- Hulp options (R:S) name + departments ---
   sheet.getRange('R1').setValue('Hulp_opties').setFontWeight('bold');
@@ -586,7 +587,7 @@ function buildReferenceSheet_(ss) {
     ['Afd. HC Safety gebeld', 'Parkeer,Dienstverlening,EHBO'],
     ['Reiniging of installatie gebeld', 'Parkeer,Dienstverlening']
   ];
-  sheet.getRange(2, 18, hulp.length + 1, 19).setValues(hulp);
+  sheet.getRange(2, 18, hulp.length, 2).setValues(hulp);
 
   // --- Sitrep period options (T) ---
   sheet.getRange('T1').setValue('Sitrep_periode').setFontWeight('bold');
@@ -644,7 +645,7 @@ function buildLocationsSheet_(ss) {
     ['loc-verzamel-d', 'Verzamelplaats D (P1)', 'assembly', 'TRUE']
   ];
 
-  sheet.getRange(2, 1, locations.length + 1, 4).setValues(locations);
+  sheet.getRange(2, 1, locations.length, 4).setValues(locations);
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, 4);
 
@@ -776,15 +777,29 @@ var API_CONFIG = {
 };
 
 function doGet(e) {
+  var callback = e && e.parameter && e.parameter.callback;
   try {
     var action = (e && e.parameter && e.parameter.action) || 'config';
+
     if (action === 'config') {
-      return jsonResponse_({ data: getIncidentConfig_() });
+      return respond_(callback, { data: getIncidentConfig_() });
     }
-    return jsonResponse_({ error: 'Unknown action' }, 400);
+    return respond_(callback, { error: 'Unknown action' });
   } catch (err) {
-    return jsonResponse_({ error: String(err.message || err) }, 500);
+    return respond_(callback, { error: String(err.message || err) });
   }
+}
+
+/**
+ * JSON for direct browser navigation; JSONP for cross-origin fetch from the web app.
+ */
+function respond_(callback, payload) {
+  var json = JSON.stringify(payload);
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + json + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonResponse_(payload);
 }
 
 function doPost(e) {
@@ -937,7 +952,8 @@ function validateSubmission_(body) {
 function readLocations_(ss) {
   var sheet = ss.getSheetByName(API_CONFIG.LOCATIONS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var data = sheet.getRange(2, 1, sheet.getLastRow(), 4).getValues();
+  var numRows = sheet.getLastRow() - 1;
+  var data = sheet.getRange(2, 1, numRows, 4).getValues();
   return data.map(function (row) {
     return {
       id: String(row[0] || '').trim(),
@@ -1057,7 +1073,7 @@ function nextIncidentId_(incidentsSheet) {
   var lastRow = incidentsSheet.getLastRow();
   var maxNum = 0;
   if (lastRow >= 2) {
-    var ids = incidentsSheet.getRange(2, 1, lastRow, 1).getValues();
+    var ids = incidentsSheet.getRange(2, 1, lastRow - 1, 1).getValues();
     ids.forEach(function (row) {
       var num = parseInt(String(row[0]).replace(/\D/g, ''), 10);
       if (!isNaN(num) && num > maxNum) maxNum = num;

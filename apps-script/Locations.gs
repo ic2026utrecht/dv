@@ -38,7 +38,7 @@ function buildLocationsSheet_(ss) {
     ['loc-verzamel-d', 'Verzamelplaats D (P1)', 'assembly', 'TRUE']
   ];
 
-  sheet.getRange(2, 1, locations.length + 1, 4).setValues(locations);
+  sheet.getRange(2, 1, locations.length, 4).setValues(locations);
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, 4);
 
