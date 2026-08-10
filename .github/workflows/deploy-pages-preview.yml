@@ -32,9 +32,14 @@ jobs:
         with:
           ref: ${{ inputs.branch || github.ref }}
 
-      - name: Branch slug for preview path
-        id: slug
-        run: echo "value=${BRANCH_NAME//\//-}" >> "$GITHUB_OUTPUT"
+      - name: Preview paths
+        id: paths
+        run: |
+          slug="${BRANCH_NAME//\//-}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          echo "slug=${slug}" >> "$GITHUB_OUTPUT"
+          echo "preview_path=preview/${slug}" >> "$GITHUB_OUTPUT"
+          echo "base_url=/${repo}/preview/${slug}/" >> "$GITHUB_OUTPUT"
         env:
           BRANCH_NAME: ${{ inputs.branch || github.ref_name }}
 
@@ -52,9 +57,15 @@ jobs:
         run: pnpm run generate
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          NUXT_APP_BASE_URL: ${{ steps.paths.outputs.base_url }}
+          NUXT_PAGES_PREVIEW_PATH: ${{ steps.paths.outputs.preview_path }}
           NUXT_PUBLIC_SUPABASE_URL: ${{ vars.NUXT_PUBLIC_SUPABASE_URL }}
           NUXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NUXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NUXT_PAGES_PREVIEW_PATH: preview/${{ steps.slug.outputs.value }}
+
+      - name: Verify preview base URL in build
+        run: |
+          grep -Fq "${{ steps.paths.outputs.base_url }}_nuxt/" .output/public/index.html \
+            || (echo "Build has wrong base URL — expected ${{ steps.paths.outputs.base_url }}" && exit 1)
 
       - name: Deploy preview to gh-pages
         uses: peaceiris/actions-gh-pages@v4
@@ -62,5 +73,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: .output/public
-          destination_dir: preview/${{ steps.slug.outputs.value }}
+          destination_dir: ${{ steps.paths.outputs.preview_path }}
           keep_files: true
+          commit_message: 'Deploy preview ${{ steps.paths.outputs.slug }}'
