@@ -14,6 +14,20 @@ const saveError = ref<string | null>(null)
 
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
 
+watch(
+  () => incidents.value,
+  (list) => {
+    const id = selectedIncident.value?.incidentId
+    if (!id) {
+      return
+    }
+    const fresh = list.find(incident => incident.incidentId === id)
+    if (fresh) {
+      selectedIncident.value = fresh
+    }
+  },
+)
+
 const departmentOptions = DEPARTMENTS.map(d => ({ value: d, label: d }))
 
 const priorityOptions = PRIORITIES.map(p => ({ value: p, label: p }))

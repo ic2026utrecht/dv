@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
 import IncidentsModule from '~/repository/modules/incidents'
 
 export default defineNuxtPlugin(() => {
@@ -12,10 +11,8 @@ export default defineNuxtPlugin(() => {
     )
   }
 
-  const client = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseAnonKey || 'placeholder',
-  )
+  // Reuse the authenticated client from @nuxtjs/supabase so JWTs are applied to RLS
+  const client = useSupabaseClient()
 
   const modules = {
     incidents: new IncidentsModule(client, supabaseUrl, supabaseAnonKey),

@@ -102,7 +102,7 @@ export interface IncidentSubmission {
   incidentTypeId: string
   priority: Priority
   helpOptionIds: string[]
-  reporter: string
+  reporter?: string
   description: string
   personsInvolved?: number
   ambulanceCalled?: boolean
@@ -139,6 +139,7 @@ export interface IncidentUpdate {
   scenario?: string
   deadline?: string
   updateNotes?: string
+  updatedBy?: string
   closedBy?: string
   closureResult?: string
   latitude?: number | null
@@ -151,7 +152,42 @@ export interface IncidentUpdateResult {
   updatedAt: string
 }
 
+export interface IncidentStatusUpdate {
+  id: string
+  incidentId: string
+  incidentUpdateId?: string
+  createdAt: string
+  previousStatus?: IncidentStatus | null
+  status: IncidentStatus
+  updatedBy: string
+  notes: string
+  actionOwner: string
+  closedBy: string
+  closureResult: string
+}
+
+export interface IncidentUpdateEntry {
+  id: string
+  incidentId: string
+  createdAt: string
+  status: IncidentStatus
+  previousStatus?: IncidentStatus | null
+  updatedBy: string
+  notes: string
+  hasPayloadChanges: boolean
+}
+
 export interface ApiResponse<T> {
   data: T
   error?: string
+}
+
+export interface Staff {
+  id: string
+  firstName: string
+  lastName: string
+  phone: string
+  pinSetAt: string | null
+  isAdmin?: boolean
+  createdAt?: string
 }

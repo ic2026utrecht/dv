@@ -1,10 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ConfigResponse, SubmitIncidentResponse, IncidentsResponse, UpdateIncidentResponse } from '~/types/api'
+import type {
+  ConfigResponse,
+  SubmitIncidentResponse,
+  IncidentsResponse,
+  UpdateIncidentResponse,
+  IncidentStatusHistoryResponse,
+  IncidentUpdateHistoryResponse,
+} from '~/types/api'
 import type { IncidentSubmission, IncidentUpdate } from '~/types/models'
 import {
   assertSupabaseConfig,
   fetchSupabaseConfig,
   fetchSupabaseIncidents,
+  fetchSupabaseIncidentStatusHistory,
+  fetchSupabaseIncidentUpdates,
   postSupabaseIncident,
   postSupabaseIncidentUpdate,
 } from '~/utils/supabaseApi'
@@ -43,6 +52,16 @@ class IncidentsModule {
   async update(payload: IncidentUpdate): Promise<UpdateIncidentResponse> {
     this.assertConfigured()
     return await postSupabaseIncidentUpdate(this.client, payload)
+  }
+
+  async getStatusHistory(incidentId: string): Promise<IncidentStatusHistoryResponse> {
+    this.assertConfigured()
+    return await fetchSupabaseIncidentStatusHistory(this.client, incidentId)
+  }
+
+  async getUpdateHistory(incidentId: string): Promise<IncidentUpdateHistoryResponse> {
+    this.assertConfigured()
+    return await fetchSupabaseIncidentUpdates(this.client, incidentId)
   }
 }
 

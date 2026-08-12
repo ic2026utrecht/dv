@@ -3,8 +3,12 @@ import type { Department, Priority } from '~/types/models'
 
 const props = withDefaults(defineProps<{
   inDialog?: boolean
+  showDepartmentSelection?: boolean
+  defaultDepartment?: Department
 }>(), {
   inDialog: false,
+  showDepartmentSelection: false,
+  defaultDepartment: 'Parkeer',
 })
 
 const emit = defineEmits<{
@@ -13,19 +17,14 @@ const emit = defineEmits<{
 
 const { fetchConfig, submitIncident, config, loading, error, isLoaded } = useIncidents()
 
-const department = ref<Department | null>(null)
+const department = ref<Department | null>(
+  props.showDepartmentSelection ? null : props.defaultDepartment,
+)
 const locationId = ref<string | null>(null)
 const sectorCode = ref<string | null>(null)
 const incidentTypeId = ref<string | null>(null)
 const priority = ref<Priority | null>(null)
 const helpOptionIds = ref<string[]>([])
-const {
-  reporterName,
-  reporterPhone,
-  reporterFormatted,
-  hasReporterContact,
-  persistReporterContact,
-} = useReporterContact()
 const description = ref('')
 const personsInvolved = ref<string | null>(null)
 const ambulanceCalled = ref<'ja' | 'nee' | null>(null)
@@ -33,7 +32,6 @@ const ambulanceCalled = ref<'ja' | 'nee' | null>(null)
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
 const rasterMapOpen = ref(false)
-const { getCurrentPosition } = useGeolocation()
 
 onMounted(async () => {
   try {
@@ -80,12 +78,22 @@ const isEhbo = computed(() => department.value === 'EHBO')
 
 const priorityOptions = computed(() => config.value?.priorities ?? [])
 
+const progressTotal = computed(() => (props.showDepartmentSelection ? 5 : 4))
+
 const progressStep = computed(() => {
-  if (!department.value) return 1
-  if (!locationId.value || !parsedSector.value || !priority.value) return 2
-  if (!incidentTypeId.value) return 3
-  if (!description.value.trim() || !hasReporterContact.value) return 4
-  return 5
+  if (props.showDepartmentSelection && !department.value) {
+    return 1
+  }
+  if (!locationId.value || !parsedSector.value || !priority.value) {
+    return props.showDepartmentSelection ? 2 : 1
+  }
+  if (!incidentTypeId.value) {
+    return props.showDepartmentSelection ? 3 : 2
+  }
+  if (!description.value.trim()) {
+    return props.showDepartmentSelection ? 4 : 3
+  }
+  return props.showDepartmentSelection ? 5 : 4
 })
 
 watch(department, () => {
@@ -102,7 +110,6 @@ const canSubmit = computed(() =>
     && parsedSector.value
     && incidentTypeId.value
     && priority.value
-    && hasReporterContact.value
     && description.value.trim()
     && (!isEhbo.value || (personsInvolved.value && ambulanceCalled.value !== null)),
   ),
@@ -118,8 +125,6 @@ async function onSubmit() {
   submitError.value = null
 
   try {
-    const coords = await getCurrentPosition()
-
     const result = await submitIncident({
       department: department.value,
       locationId: locationId.value,
@@ -128,15 +133,10 @@ async function onSubmit() {
       incidentTypeId: incidentTypeId.value,
       priority: priority.value,
       helpOptionIds: helpOptionIds.value,
-      reporter: reporterFormatted.value,
       description: description.value.trim(),
       personsInvolved: isEhbo.value ? Number(personsInvolved.value) : undefined,
       ambulanceCalled: isEhbo.value ? ambulanceCalled.value === 'ja' : undefined,
-      ...(coords
-        ? { latitude: coords.latitude, longitude: coords.longitude }
-        : {}),
     })
-    persistReporterContact()
     emit('submitted', result.incidentId)
   }
   catch (err: unknown) {
@@ -178,7 +178,7 @@ async function onSubmit() {
       <!-- Progress -->
       <div class="ic-progress" aria-hidden="true">
         <div
-          v-for="n in 5"
+          v-for="n in progressTotal"
           :key="n"
           class="ic-progress-segment"
           :class="{
@@ -190,7 +190,7 @@ async function onSubmit() {
 
       <div class="space-y-4 px-4 py-5">
         <!-- Step 1: Department -->
-        <section class="ic-card ic-card--accent">
+        <section v-if="showDepartmentSelection" class="ic-card ic-card--accent">
           <p class="ic-section-title">
             Stap 1 · Afdeling
           </p>
@@ -203,7 +203,7 @@ async function onSubmit() {
         <!-- Step 2: Location & priority -->
         <section class="ic-card">
           <p class="ic-section-title">
-            Stap 2 · Locatie
+            Stap {{ showDepartmentSelection ? 2 : 1 }} · Locatie
           </p>
           <h2 class="ic-section-heading">
             Waar is het incident?
@@ -280,7 +280,7 @@ async function onSubmit() {
         <!-- Step 3: Incident details -->
         <section v-if="department" class="ic-card">
           <p class="ic-section-title">
-            Stap 3 · {{ department }}
+            Stap {{ showDepartmentSelection ? 3 : 2 }} · {{ department }}
           </p>
           <h2 class="ic-section-heading">
             Wat is er aan de hand?
@@ -339,7 +339,7 @@ async function onSubmit() {
         </section>
 
         <section
-          v-else
+          v-else-if="showDepartmentSelection"
           class="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-slate-500"
         >
           <i class="pi pi-arrow-up mb-2 text-2xl" aria-hidden="true" />
@@ -354,62 +354,27 @@ async function onSubmit() {
         <!-- Step 4: Description -->
         <section class="ic-card">
           <p class="ic-section-title">
-            Stap 4 · Melding
+            Stap {{ showDepartmentSelection ? 4 : 3 }} · Melding
           </p>
           <h2 class="ic-section-heading">
-            Omschrijving &amp; melder
+            Omschrijving
           </h2>
 
-          <div class="grid gap-5">
-            <IcFormField
-              label="Korte omschrijving"
-              html-for="description"
-              required
-              hint="Eén zin: wat gebeurt er, op dit moment?"
-            >
-              <Textarea
-                id="description"
-                v-model="description"
-                rows="3"
-                auto-resize
-                placeholder="Bijv. Rook uit kabelgoot bij stand 12…"
-                fluid
-              />
-            </IcFormField>
-
-            <IcFormField
-              label="Naam melder"
-              html-for="reporter-name"
-              required
-              hint="Voor terugkoppeling"
-            >
-              <InputText
-                id="reporter-name"
-                v-model="reporterName"
-                autocomplete="name"
-                placeholder="Jan Jansen"
-                fluid
-                @blur="persistReporterContact"
-              />
-            </IcFormField>
-
-            <IcFormField
-              label="Telefoonnummer"
-              html-for="reporter-phone"
-              required
-            >
-              <InputText
-                id="reporter-phone"
-                v-model="reporterPhone"
-                type="tel"
-                inputmode="tel"
-                autocomplete="tel"
-                placeholder="06 12345678"
-                fluid
-                @blur="persistReporterContact"
-              />
-            </IcFormField>
-          </div>
+          <IcFormField
+            label="Korte omschrijving"
+            html-for="description"
+            required
+            hint="Eén zin: wat gebeurt er, op dit moment?"
+          >
+            <Textarea
+              id="description"
+              v-model="description"
+              rows="3"
+              auto-resize
+              placeholder="Bijv. Rook uit kabelgoot bij stand 12…"
+              fluid
+            />
+          </IcFormField>
         </section>
 
         <Message v-if="submitError" severity="error" :closable="false">

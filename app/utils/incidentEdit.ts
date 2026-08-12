@@ -23,7 +23,6 @@ export interface IncidentEditForm {
   helpOptionIds: string[]
   priority: Priority
   reporter: string
-  freeField: string
   flagEhbo: boolean
   flagBeveiliging: boolean
   flagHcSafety: boolean
@@ -33,11 +32,8 @@ export interface IncidentEditForm {
   actionOwner: string
   scenario: string
   deadline: string
-  updateNotes: string
   closedBy: string
   closureResult: string
-  latitude: string
-  longitude: string
 }
 
 function normalizeName(value: string): string {
@@ -136,7 +132,6 @@ export function incidentToEditForm(
     helpOptionIds: resolveHelpOptionIds(incident, config),
     priority: incident.priority,
     reporter: incident.reporter || '',
-    freeField: incident.freeField || '',
     flagEhbo: incident.flagEhbo ?? false,
     flagBeveiliging: incident.flagBeveiliging ?? false,
     flagHcSafety: incident.flagHcSafety ?? false,
@@ -146,21 +141,9 @@ export function incidentToEditForm(
     actionOwner: incident.actionOwner || '',
     scenario: incident.scenario || '',
     deadline: toDatetimeLocalValue(incident.deadline),
-    updateNotes: '',
     closedBy: incident.closedBy || '',
     closureResult: incident.closureResult || '',
-    latitude: incident.latitude != null ? String(incident.latitude) : '',
-    longitude: incident.longitude != null ? String(incident.longitude) : '',
   }
-}
-
-function parseOptionalCoord(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return null
-  }
-  const parsed = Number(trimmed)
-  return Number.isNaN(parsed) ? null : parsed
 }
 
 export function editFormToIncidentUpdate(
@@ -186,7 +169,6 @@ export function editFormToIncidentUpdate(
     helpOptionIds: form.helpOptionIds,
     priority: form.priority,
     reporter: form.reporter.trim(),
-    freeField: form.freeField.trim(),
     flagEhbo: form.flagEhbo,
     flagBeveiliging: form.flagBeveiliging,
     flagHcSafety: form.flagHcSafety,
@@ -195,10 +177,7 @@ export function editFormToIncidentUpdate(
     actionOwner: form.actionOwner.trim(),
     scenario: form.scenario.trim(),
     deadline: form.deadline || undefined,
-    updateNotes: form.updateNotes.trim() || undefined,
     closedBy: form.closedBy.trim() || undefined,
     closureResult: form.closureResult.trim() || undefined,
-    latitude: parseOptionalCoord(form.latitude),
-    longitude: parseOptionalCoord(form.longitude),
   }
 }

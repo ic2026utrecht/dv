@@ -103,28 +103,24 @@ async function postIncident(supabase, payload, helpOptions) {
     description += ` [betrokkenen: ${payload.personsInvolved}]`
   }
 
-  const { data, error } = await supabase
-    .from('incidents')
-    .insert({
-      department: payload.department,
-      location_id: payload.locationId,
-      sector_row: payload.sectorRow,
-      sector_column: payload.sectorColumn,
-      sector_label: '',
-      incident_type_id: payload.incidentTypeId,
-      description,
-      help_option_ids: helpOptionIds.join(','),
-      priority: payload.priority,
-      reporter: payload.reporter.trim(),
-      status: 'Open',
-      source_row: 'webapp',
-    })
-    .select('incident_id, timestamp')
-    .single()
+  const { data, error } = await supabase.rpc('submit_public_incident', {
+    p_department: payload.department,
+    p_location_id: payload.locationId,
+    p_sector_row: payload.sectorRow,
+    p_sector_column: payload.sectorColumn,
+    p_incident_type_id: payload.incidentTypeId,
+    p_description: description,
+    p_help_option_ids: helpOptionIds.join(','),
+    p_priority: payload.priority,
+    p_reporter: payload.reporter.trim(),
+    p_latitude: null,
+    p_longitude: null,
+  })
 
   if (error) throw new Error(error.message)
-  if (!data?.incident_id) throw new Error('Missing incident_id in response')
-  return data
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row?.incident_id) throw new Error('Missing incident_id in response')
+  return row
 }
 
 function firstOf(list, predicate) {

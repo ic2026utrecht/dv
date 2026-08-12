@@ -1,10 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ConfigResponse, SubmitIncidentResponse, IncidentsResponse, UpdateIncidentResponse } from '~/types/api'
+import type {
+  ConfigResponse,
+  SubmitIncidentResponse,
+  IncidentsResponse,
+  UpdateIncidentResponse,
+  IncidentStatusHistoryResponse,
+  IncidentUpdateHistoryResponse,
+} from '~/types/api'
 import type {
   Department,
   HelpOption,
   Incident,
   IncidentConfig,
+  IncidentStatusUpdate,
+  IncidentUpdateEntry,
   IncidentSubmission,
   IncidentType,
   IncidentUpdate,
@@ -61,6 +70,77 @@ interface IncidentViewRow {
   help_option_ids: string
 }
 
+interface IncidentStatusUpdateRow {
+  id: string
+  incident_id: string
+  incident_update_id: string | null
+  created_at: string
+  previous_status: string | null
+  status: string
+  updated_by: string
+  notes: string
+  action_owner: string
+  closed_by: string
+  closure_result: string
+}
+
+interface IncidentUpdateRow {
+  id: string
+  incident_id: string
+  created_at: string
+  status: string
+  notes: string
+  updated_by: string
+  payload: Record<string, unknown> | null
+}
+
+function payloadHasChanges(payload: Record<string, unknown> | null): boolean {
+  if (!payload) {
+    return false
+  }
+  return Object.values(payload).some((value) => {
+    if (value === null || value === undefined || value === '') {
+      return false
+    }
+    if (Array.isArray(value) && value.length === 0) {
+      return false
+    }
+    return true
+  })
+}
+
+function mapStatusUpdateRow(row: IncidentStatusUpdateRow): IncidentStatusUpdate {
+  return {
+    id: row.id,
+    incidentId: row.incident_id,
+    incidentUpdateId: row.incident_update_id ?? undefined,
+    createdAt: row.created_at,
+    previousStatus: row.previous_status ?? null,
+    status: row.status,
+    updatedBy: row.updated_by ?? '',
+    notes: row.notes ?? '',
+    actionOwner: row.action_owner ?? '',
+    closedBy: row.closed_by ?? '',
+    closureResult: row.closure_result ?? '',
+  }
+}
+
+function mapIncidentUpdateRows(rows: IncidentUpdateRow[]): IncidentUpdateEntry[] {
+  return rows.map((row, index) => {
+    const previousStatus = index > 0 ? rows[index - 1]!.status : null
+    return {
+      id: row.id,
+      incidentId: row.incident_id,
+      createdAt: row.created_at,
+      status: row.status,
+      previousStatus: index === 0 ? null : previousStatus,
+      updatedBy: row.updated_by ?? '',
+      notes: row.notes ?? '',
+      hasPayloadChanges: payloadHasChanges(row.payload),
+    }
+  })
+}
+
 function mapViewRow(row: IncidentViewRow): Incident {
   const helpOptionIds = row.help_option_ids
     ? row.help_option_ids.split(',').map(part => part.trim()).filter(Boolean)
@@ -110,7 +190,13 @@ function mapViewRow(row: IncidentViewRow): Incident {
 }
 
 function buildUpdatePayload(payload: IncidentUpdate): Record<string, unknown> {
-  const { incidentId: _incidentId, status: _status, updateNotes: _updateNotes, ...rest } = payload
+  const {
+    incidentId: _incidentId,
+    status: _status,
+    updateNotes: _updateNotes,
+    updatedBy: _updatedBy,
+    ...rest
+  } = payload
   return rest as Record<string, unknown>
 }
 
@@ -142,7 +228,7 @@ function appendEhboDescription(description: string, personsInvolved?: number): s
 function validateSubmission(body: IncidentSubmission): void {
   const required: (keyof IncidentSubmission)[] = [
     'department', 'locationId', 'sectorRow', 'sectorColumn',
-    'incidentTypeId', 'priority', 'reporter', 'description',
+    'incidentTypeId', 'priority', 'description',
   ]
   for (const key of required) {
     if (body[key] === undefined || body[key] === null || body[key] === '') {
@@ -248,35 +334,74 @@ export async function postSupabaseIncident(
     payload.ambulanceCalled,
   )
 
-  const { data, error } = await client
-    .from('incidents')
-    .insert({
-      department: payload.department,
-      location_id: payload.locationId,
-      sector_row: payload.sectorRow,
-      sector_column: payload.sectorColumn,
-      sector_label: '',
-      incident_type_id: payload.incidentTypeId,
-      description,
-      help_option_ids: helpOptionIds,
-      priority: payload.priority,
-      reporter: payload.reporter.trim(),
-      status: 'Open',
-      source_row: 'webapp',
-      latitude: payload.latitude ?? null,
-      longitude: payload.longitude ?? null,
-    })
-    .select('incident_id, timestamp')
-    .single()
+  const { data, error } = await client.rpc('submit_public_incident', {
+    p_department: payload.department,
+    p_location_id: payload.locationId,
+    p_sector_row: payload.sectorRow ?? '',
+    p_sector_column: payload.sectorColumn ?? null,
+    p_incident_type_id: payload.incidentTypeId,
+    p_description: description,
+    p_help_option_ids: helpOptionIds,
+    p_priority: payload.priority,
+    p_reporter: payload.reporter?.trim() ?? '',
+    p_latitude: payload.latitude ?? null,
+    p_longitude: payload.longitude ?? null,
+  })
 
   if (error) throw new Error(error.message)
-  if (!data?.incident_id) throw new Error('Ongeldig antwoord van Supabase')
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row?.incident_id) throw new Error('Ongeldig antwoord van Supabase')
 
   return {
     data: {
-      incidentId: data.incident_id,
-      timestamp: data.timestamp,
+      incidentId: row.incident_id,
+      timestamp: row.timestamp,
     },
+  }
+}
+
+export async function fetchSupabaseIncidentStatusHistory(
+  client: SupabaseClient,
+  incidentId: string,
+): Promise<IncidentStatusHistoryResponse> {
+  if (!incidentId.trim()) {
+    throw new Error('incidentId verplicht')
+  }
+
+  const { data, error } = await client
+    .from('incident_status_updates')
+    .select('*')
+    .eq('incident_id', incidentId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return {
+    data: (data ?? []).map(row => mapStatusUpdateRow(row as IncidentStatusUpdateRow)),
+  }
+}
+
+export async function fetchSupabaseIncidentUpdates(
+  client: SupabaseClient,
+  incidentId: string,
+): Promise<IncidentUpdateHistoryResponse> {
+  if (!incidentId.trim()) {
+    throw new Error('incidentId verplicht')
+  }
+
+  const { data, error } = await client
+    .from('incident_updates')
+    .select('id, incident_id, created_at, status, notes, updated_by, payload')
+    .eq('incident_id', incidentId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return {
+    data: mapIncidentUpdateRows((data ?? []) as IncidentUpdateRow[]),
   }
 }
 
@@ -293,7 +418,8 @@ export async function postSupabaseIncidentUpdate(
   }
 
   const updatePayload = buildUpdatePayload(payload)
-  const updatedBy = payload.closedBy?.trim()
+  const updatedBy = payload.updatedBy?.trim()
+    || payload.closedBy?.trim()
     || payload.actionOwner?.trim()
     || payload.reporter?.trim()
     || ''

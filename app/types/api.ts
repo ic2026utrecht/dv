@@ -1,4 +1,12 @@
-import type { IncidentConfig, IncidentSubmission, IncidentSubmissionResult, Incident, IncidentUpdateResult } from '~/types/models'
+import type {
+  IncidentConfig,
+  IncidentSubmission,
+  IncidentSubmissionResult,
+  Incident,
+  IncidentUpdateResult,
+  IncidentStatusUpdate,
+  IncidentUpdateEntry,
+} from '~/types/models'
 
 export type { IncidentSubmission }
 
@@ -16,4 +24,12 @@ export interface IncidentsResponse {
 
 export interface UpdateIncidentResponse {
   data: IncidentUpdateResult
+}
+
+export interface IncidentStatusHistoryResponse {
+  data: IncidentStatusUpdate[]
+}
+
+export interface IncidentUpdateHistoryResponse {
+  data: IncidentUpdateEntry[]
 }

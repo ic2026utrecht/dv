@@ -27,7 +27,12 @@ function onSubmitted(incidentId: string) {
     content-class="ic-sitrep-create-dialog__content"
     @hide="close"
   >
-    <IncidentForm v-if="visible" in-dialog @submitted="onSubmitted" />
+    <IncidentForm
+      v-if="visible"
+      in-dialog
+      show-department-selection
+      @submitted="onSubmitted"
+    />
   </Dialog>
 </template>
 

@@ -292,6 +292,23 @@ body {
   border-bottom: 3px solid var(--ic-orange);
 }
 
+.ic-header-nav {
+  @apply mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 pt-3 text-sm;
+}
+
+.ic-header-nav__name {
+  @apply mr-auto font-medium text-white/90;
+}
+
+.ic-header-nav__link {
+  @apply text-white/80 underline-offset-2 hover:text-white hover:underline;
+}
+
+.ic-header-nav__button {
+  @apply cursor-pointer bg-transparent p-0;
+  font: inherit;
+}
+
 .ic-header-brand {
   @apply flex items-start gap-4;
 }

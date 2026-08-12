@@ -6,6 +6,31 @@ defineProps<{
   subtitle?: string
   step?: number
 }>()
+
+const route = useRoute()
+const { isLoggedIn, isAdmin, displayName, fetchMe, logout } = useStaffAuth()
+
+const showStaffNav = computed(() => {
+  const path = route.path
+  return path.startsWith('/sitrep')
+    || path.startsWith('/profile')
+    || path.startsWith('/admin')
+})
+
+onMounted(() => {
+  if (isLoggedIn.value) {
+    fetchMe().catch(() => {})
+  }
+})
+
+watch(isLoggedIn, (loggedIn) => {
+  if (loggedIn) fetchMe().catch(() => {})
+})
+
+async function onLogout() {
+  await logout()
+  await navigateTo('/login')
+}
 </script>
 
 <template>
@@ -34,5 +59,41 @@ defineProps<{
         </div>
       </div>
     </div>
+
+    <nav
+      v-if="showStaffNav && isLoggedIn"
+      class="ic-header-nav"
+      aria-label="Account"
+    >
+      <span v-if="displayName" class="ic-header-nav__name">
+        {{ displayName }}
+      </span>
+      <NuxtLink
+        to="/sitrep"
+        class="ic-header-nav__link"
+      >
+        Sitrep
+      </NuxtLink>
+      <NuxtLink
+        v-if="isAdmin"
+        to="/admin"
+        class="ic-header-nav__link"
+      >
+        Medewerkers
+      </NuxtLink>
+      <NuxtLink
+        to="/profile"
+        class="ic-header-nav__link"
+      >
+        Profiel
+      </NuxtLink>
+      <button
+        type="button"
+        class="ic-header-nav__link ic-header-nav__button"
+        @click="onLogout"
+      >
+        Uitloggen
+      </button>
+    </nav>
   </header>
 </template>

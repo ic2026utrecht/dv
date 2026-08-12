@@ -35,12 +35,25 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['primeicons/primeicons.css', '~/assets/css/main.css'],
-  modules: ['@nuxtjs/tailwindcss', '@primevue/nuxt-module', '@pinia/nuxt'],
+  modules: ['@nuxtjs/tailwindcss', '@primevue/nuxt-module', '@pinia/nuxt', '@nuxtjs/supabase'],
   runtimeConfig: {
     public: {
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL ?? '',
       supabaseAnonKey: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
       sheetsApiUrl: process.env.NUXT_PUBLIC_SHEETS_API_URL ?? '',
+    },
+  },
+  supabase: {
+    url: process.env.NUXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL,
+    key: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY,
+    redirect: false,
+    types: false,
+    clientOptions: {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
     },
   },
   primevue: {
@@ -59,7 +72,7 @@ export default defineNuxtConfig({
   },
   nitro: {
     prerender: {
-      routes: ['/kaart', '/sitrep'],
+      routes: ['/kaart'],
     },
   },
   tailwindcss: {

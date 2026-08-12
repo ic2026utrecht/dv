@@ -27,6 +27,7 @@ const emit = defineEmits<{
 }>()
 
 const { fetchConfig, config, loading: configLoading } = useIncidents()
+const { displayName, fetchMe } = useStaffAuth()
 
 const form = reactive<IncidentEditForm>({
   timestamp: '',
@@ -39,7 +40,6 @@ const form = reactive<IncidentEditForm>({
   helpOptionIds: [],
   priority: 'Middel',
   reporter: '',
-  freeField: '',
   flagEhbo: false,
   flagBeveiliging: false,
   flagHcSafety: false,
@@ -49,11 +49,8 @@ const form = reactive<IncidentEditForm>({
   actionOwner: '',
   scenario: '',
   deadline: '',
-  updateNotes: '',
   closedBy: '',
   closureResult: '',
-  latitude: '',
-  longitude: '',
 })
 
 const STATUS_OPTIONS = [
@@ -75,13 +72,31 @@ const teamFlags = [
 
 watch(
   () => props.incident,
-  (incident) => {
+  async (incident) => {
     if (!incident) {
       return
     }
     Object.assign(form, incidentToEditForm(incident, config.value))
+    await fetchMe().catch(() => {})
+    if (displayName.value) {
+      if (!form.actionOwner.trim()) {
+        form.actionOwner = displayName.value
+      }
+      if (form.status === 'Afgesloten' && !form.closedBy.trim()) {
+        form.closedBy = displayName.value
+      }
+    }
   },
   { immediate: true },
+)
+
+watch(
+  () => form.status,
+  (status) => {
+    if (status === 'Afgesloten' && !form.closedBy.trim() && displayName.value) {
+      form.closedBy = displayName.value
+    }
+  },
 )
 
 watch(
@@ -93,11 +108,20 @@ watch(
   },
 )
 
+const updatesRefreshKey = ref(0)
+
 watch(visible, (open) => {
-  if (open && !config.value) {
-    fetchConfig().catch(() => {})
+  if (open) {
+    updatesRefreshKey.value += 1
+    if (!config.value) {
+      fetchConfig().catch(() => {})
+    }
   }
 })
+
+function handleNoteAdded() {
+  updatesRefreshKey.value += 1
+}
 
 watch(
   () => form.department,
@@ -177,7 +201,7 @@ function submit() {
     modal
     :header="incident ? `${incident.incidentId} bewerken` : 'Incident'"
     class="ic-sitrep-edit-dialog"
-    :style="{ width: 'min(100vw - 2rem, 42rem)' }"
+    :style="{ width: 'min(100vw - 2rem, 72rem)' }"
     :draggable="false"
     block-scroll
     content-class="ic-sitrep-edit-dialog__content"
@@ -190,7 +214,9 @@ function submit() {
         </Message>
       </div>
 
-      <div v-else class="ic-sitrep-edit-dialog__form">
+      <div v-else class="ic-sitrep-edit-dialog__body">
+        <div class="ic-sitrep-edit-dialog__layout">
+          <div class="ic-sitrep-edit-dialog__form ic-form">
         <section class="ic-sitrep-edit-dialog__section">
           <h3 class="ic-sitrep-edit-dialog__heading">
             Identificatie
@@ -317,25 +343,6 @@ function submit() {
               auto-resize
             />
           </IcFormField>
-
-          <IcFormField label="Melder (naam en nummer)" html-for="sitrep-edit-reporter" class="mt-4">
-            <InputText
-              id="sitrep-edit-reporter"
-              v-model="form.reporter"
-              class="ic-field w-full"
-            />
-          </IcFormField>
-
-          <IcFormField label="Vrije veld" html-for="sitrep-edit-free-field" class="mt-4">
-            <Textarea
-              id="sitrep-edit-free-field"
-              v-model="form.freeField"
-              class="ic-field w-full"
-              rows="2"
-              auto-resize
-              placeholder="Extra opmerkingen uit het formulier"
-            />
-          </IcFormField>
         </section>
 
         <section class="ic-sitrep-edit-dialog__section">
@@ -413,20 +420,9 @@ function submit() {
               class="ic-field w-full"
             />
           </IcFormField>
-
-          <IcFormField label="Omschrijving update" html-for="sitrep-edit-update-notes" class="mt-4">
-            <Textarea
-              id="sitrep-edit-update-notes"
-              v-model="form.updateNotes"
-              class="ic-field w-full"
-              rows="3"
-              auto-resize
-              placeholder="Nieuwe update (wordt opgeslagen in het sheet)"
-            />
-          </IcFormField>
         </section>
 
-        <section class="ic-sitrep-edit-dialog__section">
+        <section v-if="isClosed" class="ic-sitrep-edit-dialog__section">
           <h3 class="ic-sitrep-edit-dialog__heading">
             Afsluiting
           </h3>
@@ -436,7 +432,6 @@ function submit() {
               id="sitrep-edit-closed-by"
               v-model="form.closedBy"
               class="ic-field w-full"
-              :placeholder="isClosed ? '' : 'Invullen bij status Afgesloten'"
             />
           </IcFormField>
 
@@ -447,36 +442,20 @@ function submit() {
               class="ic-field w-full"
               rows="3"
               auto-resize
-              :placeholder="isClosed ? '' : 'Invullen bij status Afgesloten'"
             />
           </IcFormField>
         </section>
 
-        <section class="ic-sitrep-edit-dialog__section">
-          <h3 class="ic-sitrep-edit-dialog__heading">
-            GPS (optioneel)
-          </h3>
+        </div>
 
-          <div class="ic-sitrep-edit-dialog__coords">
-            <IcFormField label="Latitude" html-for="sitrep-edit-latitude">
-              <InputText
-                id="sitrep-edit-latitude"
-                v-model="form.latitude"
-                class="ic-field w-full"
-                inputmode="decimal"
-              />
-            </IcFormField>
-            <IcFormField label="Longitude" html-for="sitrep-edit-longitude">
-              <InputText
-                id="sitrep-edit-longitude"
-                v-model="form.longitude"
-                class="ic-field w-full"
-                inputmode="decimal"
-              />
-            </IcFormField>
-          </div>
-        </section>
-
+        <aside class="ic-sitrep-edit-dialog__feed">
+          <SitrepIncidentUpdateFeed
+            :incident="incident"
+            :refresh-key="updatesRefreshKey"
+            @note-added="handleNoteAdded"
+          />
+        </aside>
+        </div>
       </div>
     </template>
 
@@ -500,19 +479,63 @@ function submit() {
 </template>
 
 <style scoped>
-.ic-sitrep-edit-dialog__content {
-  max-height: min(85dvh, 760px);
-  overflow-y: auto;
+.ic-sitrep-edit-dialog__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .ic-sitrep-edit-dialog__loading {
   padding: 0.5rem 0;
 }
 
+.ic-sitrep-edit-dialog__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) min(22rem, 34vw);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .ic-sitrep-edit-dialog__form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 1rem 0 0;
+}
+
+.ic-sitrep-edit-dialog__feed {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 0 0 1rem;
+  border-left: 1px solid rgb(135 161 198 / 0.25);
+}
+
+@media (max-width: 960px) {
+  .ic-sitrep-edit-dialog__layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) min(18rem, 38dvh);
+  }
+
+  .ic-sitrep-edit-dialog__form {
+    padding: 0;
+  }
+
+  .ic-sitrep-edit-dialog__feed {
+    padding: 0.75rem 0 0;
+    border-left: 0;
+    border-top: 1px solid rgb(135 161 198 / 0.25);
+  }
 }
 
 .ic-sitrep-edit-dialog__section {
@@ -569,16 +592,31 @@ function submit() {
   color: #334155;
 }
 
-.ic-sitrep-edit-dialog__coords {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
 .ic-sitrep-edit-dialog__form :deep(.p-inputtext),
 .ic-sitrep-edit-dialog__form :deep(.p-textarea),
 .ic-sitrep-edit-dialog__form :deep(.p-select),
 .ic-sitrep-edit-dialog__form :deep(.p-multiselect) {
   width: 100%;
+}
+</style>
+
+<style>
+.ic-sitrep-edit-dialog.p-dialog {
+  display: flex;
+  flex-direction: column;
+  height: min(90dvh, 820px);
+  max-height: min(90dvh, 820px);
+}
+
+.ic-sitrep-edit-dialog.p-dialog .p-dialog-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ic-sitrep-edit-dialog.p-dialog .p-dialog-footer {
+  flex-shrink: 0;
 }
 </style>

@@ -2,14 +2,14 @@
 import rasterMap from '~/assets/images/raster-map.png'
 import { getSectorMarkerPosition } from '~/constants/rasterMapGrid'
 import type { Incident } from '~/types/models'
-import { getIncidentSeverity, severityMarkerClass } from '~/utils/sitrepColors'
+import { getIncidentSeverity, severityMarkerClass, type SitrepSeverity } from '~/utils/sitrepColors'
 
 const props = defineProps<{
   incidents: Incident[]
 }>()
 
 const { filterIncidents } = useSitrepQuery()
-const hoveredId = ref<string | null>(null)
+const hoveredSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
 
@@ -32,21 +32,64 @@ const markerLayerStyle = computed(() => ({
   '--map-scale': scale.value,
 }))
 
-const markers = computed(() =>
-  filterIncidents(props.incidents)
-    .filter(i => i.sector)
-    .map((incident) => {
-      const position = getSectorMarkerPosition(incident.sector)
-      if (!position) {
-        return null
-      }
-      return {
-        incident,
+const SEVERITY_RANK: Record<SitrepSeverity, number> = {
+  critical: 0,
+  high: 1,
+  warning: 2,
+  ok: 3,
+  closed: 4,
+}
+
+function getHighestSeverity(severities: SitrepSeverity[]): SitrepSeverity {
+  return severities.reduce((highest, current) =>
+    SEVERITY_RANK[current] < SEVERITY_RANK[highest] ? current : highest,
+  )
+}
+
+const markers = computed(() => {
+  const bySector = new Map<string, {
+    position: { left: string, top: string }
+    incidents: Incident[]
+    severities: SitrepSeverity[]
+  }>()
+
+  for (const incident of filterIncidents(props.incidents)) {
+    if (!incident.sector) {
+      continue
+    }
+
+    const position = getSectorMarkerPosition(incident.sector)
+    if (!position) {
+      continue
+    }
+
+    const existing = bySector.get(incident.sector)
+    const severity = getIncidentSeverity(incident)
+
+    if (existing) {
+      existing.incidents.push(incident)
+      existing.severities.push(severity)
+    }
+    else {
+      bySector.set(incident.sector, {
         position,
-        severity: getIncidentSeverity(incident),
-      }
-    })
-    .filter((m): m is NonNullable<typeof m> => m !== null),
+        incidents: [incident],
+        severities: [severity],
+      })
+    }
+  }
+
+  return Array.from(bySector.entries()).map(([sector, group]) => ({
+    sector,
+    position: group.position,
+    incidents: group.incidents,
+    count: group.incidents.length,
+    severity: getHighestSeverity(group.severities),
+  }))
+})
+
+const incidentCountOnMap = computed(() =>
+  markers.value.reduce((total, marker) => total + marker.count, 0),
 )
 
 function formatTime(timestamp: string): string {
@@ -96,7 +139,7 @@ function formatTime(timestamp: string): string {
             <span class="ic-sitrep-dot ic-sitrep-dot--ok" /> Laag
           </span>
           <span class="ic-sitrep-legend-item ic-sitrep-map__count">
-            {{ markers.length }} op kaart
+            {{ incidentCountOnMap }} op kaart
           </span>
         </div>
       </div>
@@ -127,43 +170,81 @@ function formatTime(timestamp: string): string {
           >
           <div class="ic-sitrep-map__markers" :style="markerLayerStyle">
             <button
-              v-for="{ incident, position, severity } in markers"
-              :key="incident.incidentId"
+              v-for="{ sector, position, incidents, count, severity } in markers"
+              :key="sector"
               type="button"
               :class="[
                 severityMarkerClass(severity),
-                { 'ic-sitrep-marker--active': hoveredId === incident.incidentId },
+                { 'ic-sitrep-marker--active': hoveredSector === sector },
               ]"
               :style="{ left: position.left, top: position.top }"
-              :aria-label="`${incident.incidentId} op ${incident.sector}`"
-              @mouseenter="hoveredId = incident.incidentId"
-              @mouseleave="hoveredId = null"
-              @focus="hoveredId = incident.incidentId"
-              @blur="hoveredId = null"
+              :aria-label="count > 1
+                ? `${count} incidenten op ${sector}`
+                : `${incidents[0]!.incidentId} op ${sector}`"
+              @mouseenter="hoveredSector = sector"
+              @mouseleave="hoveredSector = null"
+              @focus="hoveredSector = sector"
+              @blur="hoveredSector = null"
             >
               <span class="ic-sitrep-marker__pulse" aria-hidden="true" />
-              <span class="ic-sitrep-marker__label">{{ incident.sector }}</span>
+              <span
+                v-if="count > 1"
+                :class="['ic-sitrep-marker__count', `ic-sitrep-marker__count--${severity}`]"
+                aria-hidden="true"
+              >
+                {{ count }}
+              </span>
+              <span class="ic-sitrep-marker__label">{{ sector }}</span>
 
               <div
-                v-if="hoveredId === incident.incidentId"
+                v-if="hoveredSector === sector"
                 class="ic-sitrep-tooltip"
+                :class="{ 'ic-sitrep-tooltip--stack': count > 1 }"
                 role="tooltip"
               >
-                <p class="ic-sitrep-tooltip__id">
-                  {{ incident.incidentId }}
-                </p>
-                <p class="ic-sitrep-tooltip__type">
-                  {{ incident.incidentTypeName }}
-                </p>
-                <p class="ic-sitrep-tooltip__loc">
-                  {{ incident.locationName }} · {{ incident.sector }}
-                </p>
-                <p class="ic-sitrep-tooltip__meta">
-                  {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
-                </p>
-                <p v-if="incident.description" class="ic-sitrep-tooltip__desc">
-                  {{ incident.description }}
-                </p>
+                <template v-if="count > 1">
+                  <p class="ic-sitrep-tooltip__heading">
+                    {{ count }} incidenten · {{ sector }}
+                  </p>
+                  <div
+                    v-for="incident in incidents"
+                    :key="incident.incidentId"
+                    class="ic-sitrep-tooltip__entry"
+                  >
+                    <p class="ic-sitrep-tooltip__id">
+                      {{ incident.incidentId }}
+                    </p>
+                    <p class="ic-sitrep-tooltip__type">
+                      {{ incident.incidentTypeName }}
+                    </p>
+                    <p class="ic-sitrep-tooltip__loc">
+                      {{ incident.locationName }} · {{ incident.sector }}
+                    </p>
+                    <p class="ic-sitrep-tooltip__meta">
+                      {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
+                    </p>
+                    <p v-if="incident.description" class="ic-sitrep-tooltip__desc">
+                      {{ incident.description }}
+                    </p>
+                  </div>
+                </template>
+                <template v-else>
+                  <p class="ic-sitrep-tooltip__id">
+                    {{ incidents[0]!.incidentId }}
+                  </p>
+                  <p class="ic-sitrep-tooltip__type">
+                    {{ incidents[0]!.incidentTypeName }}
+                  </p>
+                  <p class="ic-sitrep-tooltip__loc">
+                    {{ incidents[0]!.locationName }} · {{ incidents[0]!.sector }}
+                  </p>
+                  <p class="ic-sitrep-tooltip__meta">
+                    {{ incidents[0]!.priority }} · {{ incidents[0]!.status }} · {{ formatTime(incidents[0]!.timestamp) }}
+                  </p>
+                  <p v-if="incidents[0]!.description" class="ic-sitrep-tooltip__desc">
+                    {{ incidents[0]!.description }}
+                  </p>
+                </template>
               </div>
             </button>
           </div>
@@ -362,6 +443,46 @@ function formatTime(timestamp: string): string {
   display: none;
 }
 
+.ic-sitrep-marker__count {
+  position: absolute;
+  top: -0.3125rem;
+  right: -0.3125rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.875rem;
+  height: 0.875rem;
+  padding: 0 0.125rem;
+  border: 1.5px solid #fff;
+  border-radius: 9999px;
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+.ic-sitrep-marker__count--critical {
+  background: var(--ic-critical);
+}
+
+.ic-sitrep-marker__count--high {
+  background: var(--ic-high);
+}
+
+.ic-sitrep-marker__count--warning {
+  background: var(--ic-orange);
+}
+
+.ic-sitrep-marker__count--ok {
+  background: #22c55e;
+}
+
+.ic-sitrep-marker__count--closed {
+  background: #94a3b8;
+}
+
 .ic-sitrep-marker__label {
   position: absolute;
   top: calc(100% + 2px);
@@ -402,6 +523,24 @@ function formatTime(timestamp: string): string {
   transform: translateX(-50%);
   border: 6px solid transparent;
   border-top-color: rgb(28 29 82 / 0.95);
+}
+
+.ic-sitrep-tooltip--stack {
+  max-width: 18rem;
+}
+
+.ic-sitrep-tooltip__heading {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.2);
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.ic-sitrep-tooltip__entry + .ic-sitrep-tooltip__entry {
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid rgb(255 255 255 / 0.15);
 }
 
 .ic-sitrep-tooltip__id {
