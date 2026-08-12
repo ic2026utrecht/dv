@@ -3,9 +3,11 @@ import {
   corsHeaders,
   errorResponse,
   isValidE164,
+  isValidExistingPin,
   isValidPin,
   jsonResponse,
   normalizePhone,
+  normalizePin,
   phoneToEmail,
 } from '../_shared/staffAuth.ts'
 
@@ -169,9 +171,9 @@ async function handleCheck(body: Record<string, unknown>) {
 
 async function handleLogin(body: Record<string, unknown>) {
   const phone = normalizePhone(body.phone)
-  const pin = body.pin
+  const pin = normalizePin(body.pin)
   if (!isValidE164(phone)) return errorResponse('Ongeldig telefoonnummer')
-  if (!isValidPin(pin)) return errorResponse('PIN moet 6 cijfers zijn')
+  if (!isValidExistingPin(pin)) return errorResponse('PIN moet 4 of 6 cijfers zijn')
 
   const service = getServiceClient()
   const { data: staff, error: staffError } = await service
@@ -192,7 +194,7 @@ async function handleLogin(body: Record<string, unknown>) {
   const anon = getAnonClient()
   const { data: sessionData, error: signInError } = await anon.auth.signInWithPassword({
     email: phoneToEmail(phone),
-    password: pin as string,
+    password: pin,
   })
   if (signInError) {
     return errorResponse('Onjuiste PIN', 401)
@@ -209,9 +211,9 @@ async function handleChangePin(req: Request, body: Record<string, unknown>) {
   const auth = await requireUser(req)
   if ('error' in auth && auth.error) return auth.error
 
-  const currentPin = body.currentPin
-  const newPin = body.newPin
-  if (!isValidPin(currentPin)) return errorResponse('Huidige PIN is ongeldig')
+  const currentPin = normalizePin(body.currentPin)
+  const newPin = normalizePin(body.newPin)
+  if (!isValidExistingPin(currentPin)) return errorResponse('Huidige PIN moet 4–6 cijfers zijn')
   if (!isValidPin(newPin)) return errorResponse('Nieuwe PIN moet 6 cijfers zijn')
   if (currentPin === newPin) return errorResponse('Nieuwe PIN moet anders zijn')
 
@@ -228,18 +230,18 @@ async function handleChangePin(req: Request, body: Record<string, unknown>) {
   const anon = getAnonClient()
   const { error: verifyError } = await anon.auth.signInWithPassword({
     email: phoneToEmail(staff.phone),
-    password: currentPin as string,
+    password: currentPin,
   })
   if (verifyError) return errorResponse('Huidige PIN is onjuist', 401)
 
   const { error: updateError } = await service.auth.admin.updateUserById(auth.user!.id, {
-    password: newPin as string,
+    password: newPin,
   })
   if (updateError) throw new Error(updateError.message)
 
   const { data: sessionData, error: signInError } = await anon.auth.signInWithPassword({
     email: phoneToEmail(staff.phone),
-    password: newPin as string,
+    password: newPin,
   })
   if (signInError) throw new Error(signInError.message)
 
@@ -270,7 +272,7 @@ async function handleAddStaff(req: Request, body: Record<string, unknown>) {
   const firstName = String(body.firstName ?? '').trim()
   const lastName = String(body.lastName ?? '').trim()
   const phone = normalizePhone(body.phone)
-  const pin = body.pin
+  const pin = normalizePin(body.pin)
   const isAdmin = Boolean(body.isAdmin)
 
   if (!firstName || !lastName) return errorResponse('Voor- en achternaam verplicht')
@@ -282,7 +284,7 @@ async function handleAddStaff(req: Request, body: Record<string, unknown>) {
 
   const { data: created, error: createError } = await service.auth.admin.createUser({
     email,
-    password: pin as string,
+    password: pin,
     email_confirm: true,
     user_metadata: {
       first_name: firstName,
@@ -361,12 +363,13 @@ async function handleUpdateStaff(req: Request, body: Record<string, unknown>) {
 
   // Optional PIN reset (admin for others, or anyone for self)
   if (pin !== undefined && pin !== null && String(pin).trim() !== '') {
-    if (!isValidPin(pin)) return errorResponse('PIN moet 6 cijfers zijn')
+    const normalizedPin = normalizePin(pin)
+    if (!isValidPin(normalizedPin)) return errorResponse('PIN moet 6 cijfers zijn')
     if (!target.auth_user_id) {
       return errorResponse('Deze medewerker heeft nog geen login')
     }
     const { error: pinError } = await service.auth.admin.updateUserById(target.auth_user_id, {
-      password: String(pin),
+      password: normalizedPin,
     })
     if (pinError) throw new Error(pinError.message)
   }

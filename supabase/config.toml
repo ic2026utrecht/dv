@@ -6,3 +6,9 @@ enabled = true
 
 [db]
 major_version = 17
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.whatsapp-manage]
+verify_jwt = true

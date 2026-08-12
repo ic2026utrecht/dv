@@ -3,6 +3,7 @@
 ## Links
 
 - **Webformulier:** https://brighterflow.github.io/ic2026/
+- **WhatsApp setup:** see [whatsapp-setup.md](./whatsapp-setup.md) for Evolution API + `/whatsapp` live feed
 - **Workbook:** https://docs.google.com/spreadsheets/d/1O0H1ozAEeCEFRUBj_UPbLNw4eAq1CmbQAt3YKpE2A3Q/edit
 
 ## Roles

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Staff } from '~/types/models'
 import { formatStaffName } from '~/utils/staffName'
-import { isValidE164, isValidPin, normalizePhone } from '~/utils/phone'
+import { isValidE164, isValidPin, normalizePhone, normalizePin } from '~/utils/phone'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
@@ -62,7 +62,7 @@ async function onAdd() {
       firstName: firstName.value.trim(),
       lastName: lastName.value.trim(),
       phone: normalizePhone(phone.value),
-      pin: pin.value.trim(),
+      pin: normalizePin(pin.value),
       isAdmin: makeAdmin.value,
     })
     firstName.value = ''
@@ -101,7 +101,7 @@ async function saveEdit() {
     return
   }
 
-  const trimmedPin = editPin.value.trim()
+  const trimmedPin = normalizePin(editPin.value)
   if (trimmedPin && !isValidPin(trimmedPin)) {
     editError.value = 'PIN moet 6 cijfers zijn'
     return

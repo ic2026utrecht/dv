@@ -24,6 +24,15 @@ export function isValidE164(phone: string): boolean {
   return /^\+[1-9][0-9]{7,14}$/.test(phone)
 }
 
+export function normalizePin(input: string): string {
+  return String(input ?? '').trim().replace(/\D/g, '')
+}
+
 export function isValidPin(pin: string): boolean {
-  return /^\d{6}$/.test(pin)
+  return /^\d{6}$/.test(normalizePin(pin))
+}
+
+/** Accept legacy PINs (4–6 digits) for login and verifying the current PIN. */
+export function isValidExistingPin(pin: string): boolean {
+  return /^\d{4,6}$/.test(normalizePin(pin))
 }

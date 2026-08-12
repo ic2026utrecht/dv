@@ -191,3 +191,49 @@ export interface Staff {
   isAdmin?: boolean
   createdAt?: string
 }
+
+export type WhatsappConnectionStatus = 'disconnected' | 'qr' | 'connecting' | 'connected'
+
+export type WhatsappMessageDirection = 'in' | 'out'
+
+export type WhatsappMessageActionStatus = 'new' | 'handled' | 'dismissed' | 'flagged'
+
+export interface WhatsappConnectionInfo {
+  status: WhatsappConnectionStatus
+  phone: string
+  hasQr: boolean
+  qrBase64?: string
+  qrUpdatedAt?: string | null
+  lastConnectedAt?: string | null
+  isAdmin?: boolean
+}
+
+export interface WhatsappGroup {
+  id: string
+  groupJid: string
+  name: string
+  isMonitored: boolean
+  lastMessageAt: string | null
+  unreadCount: number
+}
+
+export interface WhatsappMessage {
+  id: string
+  externalId: string
+  groupJid: string
+  groupName: string
+  direction: WhatsappMessageDirection
+  senderName: string
+  senderPhone: string
+  senderJid: string
+  body: string
+  receivedAt: string
+  actionStatus: WhatsappMessageActionStatus
+  incidentId: string | null
+  handledBy: string
+  handledAt: string | null
+  replyText: string
+}
+
+export type WhatsappFeedStatusFilter = 'actionable' | 'new' | 'all' | 'handled' | 'flagged'
+export type WhatsappFeedPeriodFilter = 'today' | '24h' | 'all'

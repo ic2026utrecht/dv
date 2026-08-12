@@ -1,4 +1,5 @@
 import IncidentsModule from '~/repository/modules/incidents'
+import WhatsAppModule from '~/repository/modules/whatsapp'
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
@@ -16,6 +17,7 @@ export default defineNuxtPlugin(() => {
 
   const modules = {
     incidents: new IncidentsModule(client, supabaseUrl, supabaseAnonKey),
+    whatsapp: new WhatsAppModule(client, supabaseUrl, supabaseAnonKey),
   }
 
   return {

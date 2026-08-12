@@ -56,6 +56,15 @@ export function phoneToEmail(phone: string): string {
   return `${local}@staff.ic2026.local`
 }
 
+export function normalizePin(input: unknown): string {
+  return String(input ?? '').trim().replace(/\D/g, '')
+}
+
 export function isValidPin(pin: unknown): pin is string {
-  return typeof pin === 'string' && /^\d{6}$/.test(pin)
+  return /^\d{6}$/.test(normalizePin(pin))
+}
+
+/** Accept legacy PINs (4–6 digits) for login and verifying the current PIN. */
+export function isValidExistingPin(pin: unknown): pin is string {
+  return /^\d{4,6}$/.test(normalizePin(pin))
 }

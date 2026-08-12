@@ -15,7 +15,10 @@ const showStaffNav = computed(() => {
   return path.startsWith('/sitrep')
     || path.startsWith('/profile')
     || path.startsWith('/admin')
+    || path.startsWith('/whatsapp')
 })
+
+const { unreadTotal } = useWhatsappFeed()
 
 onMounted(() => {
   if (showStaffNav.value) {
@@ -82,6 +85,20 @@ function isActive(prefix: string): boolean {
           :class="{ 'ic-staff-nav__link--active': isActive('/sitrep') }"
         >
           Sitrep
+        </NuxtLink>
+        <NuxtLink
+          to="/whatsapp"
+          class="ic-staff-nav__link"
+          :class="{ 'ic-staff-nav__link--active': isActive('/whatsapp') }"
+        >
+          WhatsApp
+          <span
+            v-if="unreadTotal > 0"
+            class="ic-wa-nav-badge"
+            :aria-label="`${unreadTotal} nieuwe berichten`"
+          >
+            {{ unreadTotal > 99 ? '99+' : unreadTotal }}
+          </span>
         </NuxtLink>
         <NuxtLink
           to="/profile"

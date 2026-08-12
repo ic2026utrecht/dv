@@ -1,6 +1,6 @@
 import type { Staff } from '~/types/models'
 import { formatStaffName } from '~/utils/staffName'
-import { isValidE164, isValidPin, normalizePhone } from '~/utils/phone'
+import { isValidE164, isValidExistingPin, isValidPin, normalizePhone, normalizePin } from '~/utils/phone'
 
 interface StaffAuthResponse {
   ok?: boolean
@@ -100,19 +100,25 @@ export function useStaffAuth() {
 
   async function login(phoneInput: string, pin: string) {
     const phone = normalizePhone(phoneInput)
-    if (!isValidPin(pin)) throw new Error('PIN moet 6 cijfers zijn')
-    const result = await callStaffAuth({ action: 'login', phone, pin })
+    const normalizedPin = normalizePin(pin)
+    if (!isValidExistingPin(normalizedPin)) throw new Error('PIN moet 4 of 6 cijfers zijn')
+    const result = await callStaffAuth({ action: 'login', phone, pin: normalizedPin })
     await applySession(result.session)
     if (result.staff) staff.value = result.staff
     return result.staff
   }
 
   async function changePin(currentPin: string, newPin: string) {
-    if (!isValidPin(currentPin) || !isValidPin(newPin)) {
-      throw new Error('PIN moet 6 cijfers zijn')
+    const current = normalizePin(currentPin)
+    const next = normalizePin(newPin)
+    if (!isValidExistingPin(current)) {
+      throw new Error('Huidige PIN moet 4–6 cijfers zijn')
+    }
+    if (!isValidPin(next)) {
+      throw new Error('Nieuwe PIN moet 6 cijfers zijn')
     }
     const result = await callStaffAuth(
-      { action: 'change-pin', currentPin, newPin },
+      { action: 'change-pin', currentPin: current, newPin: next },
       true,
     )
     await applySession(result.session)
@@ -153,13 +159,13 @@ export function useStaffAuth() {
     pin: string
     isAdmin?: boolean
   }) {
-    if (!isValidPin(payload.pin)) throw new Error('PIN moet 6 cijfers zijn')
+    if (!isValidPin(normalizePin(payload.pin))) throw new Error('PIN moet 6 cijfers zijn')
     const result = await callStaffAuth({
       action: 'add-staff',
       firstName: payload.firstName,
       lastName: payload.lastName,
       phone: normalizePhone(payload.phone),
-      pin: payload.pin,
+      pin: normalizePin(payload.pin),
       isAdmin: Boolean(payload.isAdmin),
     }, true)
     return result.data as Staff

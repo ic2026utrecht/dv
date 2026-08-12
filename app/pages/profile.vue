@@ -72,13 +72,31 @@ async function saveProfile() {
 async function savePin() {
   pinError.value = null
   pinMessage.value = null
-  if (newPin.value !== confirmPin.value) {
+
+  const current = normalizePin(currentPin.value)
+  const next = normalizePin(newPin.value)
+  const confirm = normalizePin(confirmPin.value)
+
+  if (!current) {
+    pinError.value = 'Voer je huidige PIN in'
+    return
+  }
+  if (!isValidExistingPin(current)) {
+    pinError.value = 'Huidige PIN moet 4–6 cijfers zijn'
+    return
+  }
+  if (!isValidPin(next)) {
+    pinError.value = 'Nieuwe PIN moet 6 cijfers zijn'
+    return
+  }
+  if (next !== confirm) {
     pinError.value = 'Nieuwe PIN komt niet overeen'
     return
   }
+
   savingPin.value = true
   try {
-    await changePin(currentPin.value, newPin.value)
+    await changePin(current, next)
     currentPin.value = ''
     newPin.value = ''
     confirmPin.value = ''
@@ -173,6 +191,9 @@ async function savePin() {
 
           <div>
             <label class="ic-label" for="pin-current">Huidige PIN</label>
+            <p class="ic-label-hint">
+              Je huidige PIN (4–6 cijfers).
+            </p>
             <InputText
               id="pin-current"
               v-model="currentPin"
@@ -180,7 +201,7 @@ async function savePin() {
               type="password"
               inputmode="numeric"
               maxlength="6"
-              pattern="\d{6}"
+              pattern="\d{4,6}"
             />
           </div>
           <div>
