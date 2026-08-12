@@ -4,7 +4,7 @@ definePageMeta({
 })
 
 useHead({
-  title: 'Sitrep — IC2026 DV',
+  title: 'Sitrep — IC2026 Dienstverlening',
 })
 
 const {
