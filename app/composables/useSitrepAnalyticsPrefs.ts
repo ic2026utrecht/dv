@@ -9,6 +9,7 @@ export type SitrepAnalyticsChartId =
   | 'timeline-volume'
   | 'timeline-priority'
   | 'timeline-department'
+  | 'timeline-closed'
 
 export interface SitrepAnalyticsChartMeta {
   id: SitrepAnalyticsChartId
@@ -64,6 +65,12 @@ export const SITREP_ANALYTICS_CHARTS: SitrepAnalyticsChartMeta[] = [
     id: 'timeline-department',
     title: 'Trend per afdeling',
     description: 'Nieuwe meldingen per interval, uitgesplitst naar afdeling',
+    group: 'trend',
+  },
+  {
+    id: 'timeline-closed',
+    title: 'Afgesloten incidenten',
+    description: 'Aantal afgesloten meldingen per interval',
     group: 'trend',
   },
 ]

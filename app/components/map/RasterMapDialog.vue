@@ -14,6 +14,7 @@ const emit = defineEmits<{
 
 const cells = buildRasterMapCells()
 const stageRef = ref<HTMLElement | null>(null)
+const pendingSector = ref<string | null>(null)
 
 const {
   transformStyle,
@@ -30,6 +31,7 @@ const {
 watch(visible, (open) => {
   if (!open) {
     reset()
+    pendingSector.value = null
   }
 })
 
@@ -37,9 +39,22 @@ function close() {
   visible.value = false
 }
 
-function onCellSelect(code: string) {
-  emit('select', code)
+function onCellTap(code: string) {
+  pendingSector.value = code
+}
+
+function confirmSelection() {
+  if (!pendingSector.value) {
+    return
+  }
+
+  emit('select', pendingSector.value)
+  pendingSector.value = null
   close()
+}
+
+function cancelSelection() {
+  pendingSector.value = null
 }
 
 function trySelectAt(clientX: number, clientY: number) {
@@ -49,7 +64,7 @@ function trySelectAt(clientX: number, clientY: number) {
 
   const code = pickSectorAtClientPoint(clientX, clientY, stageRef.value)
   if (code) {
-    onCellSelect(code)
+    onCellTap(code)
   }
 }
 
@@ -96,7 +111,7 @@ function handlePointerUp(event: PointerEvent) {
         Rasterkaart · A–M × 1–22
       </p>
       <p class="ic-raster-dialog__hint">
-        Tik op een vak · knijp om te zoomen · sleep om te verschuiven
+        Tik op een vak om te markeren · bevestig je keuze hieronder
       </p>
     </div>
 
@@ -125,10 +140,37 @@ function handlePointerUp(event: PointerEvent) {
             v-for="cell in cells"
             :key="cell.code"
             class="ic-raster-cell"
-            :class="{ 'ic-raster-cell--selected': selectedSector === cell.code }"
+            :class="{
+              'ic-raster-cell--selected': selectedSector === cell.code && pendingSector !== cell.code,
+              'ic-raster-cell--pending': pendingSector === cell.code,
+            }"
             :style="cell.style"
           />
         </div>
+      </div>
+    </div>
+
+    <div
+      v-if="pendingSector"
+      class="ic-raster-dialog__confirm"
+      role="status"
+      aria-live="polite"
+    >
+      <p class="ic-raster-dialog__confirm-text">
+        Sector <strong>{{ pendingSector }}</strong> selecteren?
+      </p>
+      <div class="ic-raster-dialog__confirm-actions">
+        <Button
+          label="Annuleren"
+          severity="secondary"
+          text
+          @click="cancelSelection"
+        />
+        <Button
+          label="Bevestigen"
+          icon="pi pi-check"
+          @click="confirmSelection"
+        />
       </div>
     </div>
   </Dialog>
@@ -244,8 +286,39 @@ function handlePointerUp(event: PointerEvent) {
 }
 
 .ic-raster-cell--selected {
-  background: rgb(230 151 50 / 0.38);
+  background: rgb(230 151 50 / 0.22);
+  border-color: rgb(230 151 50 / 0.45);
+  box-shadow: inset 0 0 0 1px rgb(230 151 50 / 0.35);
+}
+
+.ic-raster-cell--pending {
+  background: rgb(230 151 50 / 0.48);
   border-color: var(--ic-orange);
-  box-shadow: inset 0 0 0 1px rgb(230 151 50 / 0.55);
+  box-shadow:
+    inset 0 0 0 2px rgb(230 151 50 / 0.75),
+    0 0 0 2px rgb(230 151 50 / 0.35);
+}
+
+.ic-raster-dialog__confirm {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem calc(0.875rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+  background: linear-gradient(135deg, var(--ic-brand-dark) 0%, var(--ic-brand) 100%);
+  color: #fff;
+}
+
+.ic-raster-dialog__confirm-text {
+  font-size: 0.9375rem;
+}
+
+.ic-raster-dialog__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 </style>

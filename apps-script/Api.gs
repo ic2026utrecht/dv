@@ -88,10 +88,10 @@ function getIncidentConfig_() {
       { value: 'EHBO', label: 'EHBO' }
     ],
     priorities: [
-      { value: 'Critical', label: 'Critical' },
-      { value: 'Hoog', label: 'Hoog' },
+      { value: 'Laag', label: 'Laag' },
       { value: 'Middel', label: 'Middel' },
-      { value: 'Laag', label: 'Laag' }
+      { value: 'Hoog', label: 'Hoog' },
+      { value: 'Critical', label: 'Critical' }
     ],
     supportedActions: ['config', 'submit', 'incidents', 'update', 'updateIncident'],
     apiVersion: 2,

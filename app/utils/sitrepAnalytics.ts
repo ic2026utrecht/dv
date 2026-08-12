@@ -24,6 +24,7 @@ export interface SitrepAnalyticsSnapshot {
 export interface SitrepTimelineSeries {
   labels: string[]
   totals: number[]
+  closedTotals: number[]
   byPriority: Record<Priority, number[]>
   byDepartment: Record<Department, number[]>
 }
@@ -168,6 +169,7 @@ export function buildTimelineSeries(
   const buckets = buildTimeBuckets(bucket, now)
   const labels = buckets.map(b => b.label)
   const totals = buckets.map(() => 0)
+  const closedTotals = buckets.map(() => 0)
   const byPriority = {
     Critical: buckets.map(() => 0),
     Hoog: buckets.map(() => 0),
@@ -199,11 +201,24 @@ export function buildTimelineSeries(
       byPriority[incident.priority][index] += 1
       byDepartment[incident.department][index] += 1
     })
+
+    // Track closed incidents by lastUpdate timestamp
+    if (incident.status === 'Afgesloten' && incident.lastUpdate) {
+      const closedTs = new Date(incident.lastUpdate).getTime()
+      if (!Number.isNaN(closedTs)) {
+        buckets.forEach((timeBucket, index) => {
+          if (closedTs >= timeBucket.start.getTime() && closedTs < timeBucket.end.getTime()) {
+            closedTotals[index] += 1
+          }
+        })
+      }
+    }
   }
 
   return {
     labels,
     totals,
+    closedTotals,
     byPriority,
     byDepartment,
   }

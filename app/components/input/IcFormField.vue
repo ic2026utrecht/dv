@@ -4,11 +4,12 @@ defineProps<{
   hint?: string
   required?: boolean
   htmlFor?: string
+  invalid?: boolean
 }>()
 </script>
 
 <template>
-  <div class="ic-field">
+  <div class="ic-field" :class="{ 'ic-field--invalid': invalid }">
     <label v-if="htmlFor" class="ic-label" :for="htmlFor">
       {{ label }}
       <span v-if="required" class="ic-required" aria-hidden="true"> *</span>

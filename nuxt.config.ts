@@ -77,5 +77,9 @@ export default defineNuxtConfig({
   },
   tailwindcss: {
     cssPath: '~/assets/css/tailwind.css',
+    configPath: 'tailwind.config.ts',
+    config: {
+      darkMode: ['selector', '[class~="app-dark"]'],
+    },
   },
 })

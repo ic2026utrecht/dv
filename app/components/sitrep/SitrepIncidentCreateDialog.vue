@@ -23,6 +23,7 @@ function onSubmitted(incidentId: string) {
     class="ic-sitrep-create-dialog"
     :style="{ width: 'min(100vw - 2rem, 36rem)' }"
     :draggable="false"
+    :dismissable-mask="true"
     block-scroll
     content-class="ic-sitrep-create-dialog__content"
     @hide="close"

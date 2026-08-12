@@ -80,6 +80,29 @@ body {
   max-width: 100%;
 }
 
+.ic-field--invalid .ic-label {
+  color: #dc2626;
+}
+
+.ic-field--invalid .ic-label-hint {
+  color: #ef4444;
+}
+
+.ic-form .ic-field--invalid .p-inputtext,
+.ic-form .ic-field--invalid .p-textarea,
+.ic-form .ic-field--invalid .p-select,
+.ic-form .ic-field--invalid .p-multiselect {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.12);
+}
+
+.ic-field--invalid .ic-choice-row,
+.ic-field--invalid .ic-dept-grid {
+  border-radius: 0.5rem;
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+
 /*
  * Tailwind preflight zeros input/textarea padding. PrimeVue FormField also
  * shadowed our IcFormField wrapper, so these rules target .ic-form directly.
@@ -192,28 +215,73 @@ body {
   font-weight: 600;
 }
 
+.ic-choice-btn--critical {
+  border-color: rgb(153 27 27 / 0.22);
+  background: #fff;
+  color: #991b1b;
+}
+
 .ic-choice-btn--critical.ic-choice-btn--selected {
   border-color: var(--ic-critical);
-  background: rgb(153 27 27 / 0.1);
+  border-width: 2px;
+  background: rgb(153 27 27 / 0.34);
   color: #7f1d1d;
+  box-shadow: 0 0 0 3px rgb(153 27 27 / 0.2);
+  font-weight: 700;
+}
+
+.ic-choice-btn--hoog {
+  border-color: rgb(239 68 68 / 0.22);
+  background: #fff;
+  color: #dc2626;
 }
 
 .ic-choice-btn--hoog.ic-choice-btn--selected {
   border-color: var(--ic-high);
-  background: rgb(239 68 68 / 0.12);
-  color: #b91c1c;
+  border-width: 2px;
+  background: rgb(239 68 68 / 0.32);
+  color: #991b1b;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 0.18);
+  font-weight: 700;
+}
+
+.ic-choice-btn--middel {
+  border-color: rgb(230 151 50 / 0.28);
+  background: #fff;
+  color: #c47f2a;
 }
 
 .ic-choice-btn--middel.ic-choice-btn--selected {
-  border-color: var(--ic-medium);
-  background: rgb(112 0 159 / 0.08);
-  color: #6b21a8;
+  border-color: var(--ic-orange);
+  border-width: 2px;
+  background: rgb(230 151 50 / 0.38);
+  color: #78350f;
+  box-shadow: 0 0 0 3px rgb(230 151 50 / 0.22);
+  font-weight: 700;
+}
+
+.ic-choice-btn--laag {
+  border-color: rgb(34 197 94 / 0.25);
+  background: #fff;
+  color: #16a34a;
 }
 
 .ic-choice-btn--laag.ic-choice-btn--selected {
-  border-color: var(--ic-accent);
-  background: rgb(135 161 198 / 0.22);
-  color: #334155;
+  border-color: #22c55e;
+  border-width: 2px;
+  background: rgb(34 197 94 / 0.3);
+  color: #14532d;
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.18);
+  font-weight: 700;
+}
+
+.ic-choice-row--priority .ic-choice-btn:not(.ic-choice-btn--selected) {
+  opacity: 0.72;
+}
+
+.ic-choice-row--priority .ic-choice-btn:not(.ic-choice-btn--selected):hover {
+  opacity: 1;
+  border-color: #94a3b8;
 }
 
 /* Department tiles */

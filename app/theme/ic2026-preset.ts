@@ -4,17 +4,17 @@ import { definePreset } from '@primeuix/themes'
 export default definePreset(Aura, {
   semantic: {
     primary: {
-      50: '#eef0f8',
-      100: '#d5d8ec',
-      200: '#aab0d9',
-      300: '#7f88c5',
-      400: '#545fb2',
-      500: '#2d2e7e',
-      600: '#252668',
-      700: '#1c1d52',
-      800: '#14143b',
-      900: '#0b0b25',
-      950: '#050512',
+      50: '#fef8f0',
+      100: '#fcecd9',
+      200: '#f8d4b3',
+      300: '#f3bc8d',
+      400: '#eca95f',
+      500: '#e69732',
+      600: '#c47f2a',
+      700: '#a26722',
+      800: '#804f1a',
+      900: '#5e3712',
+      950: '#3c230c',
     },
   },
 })

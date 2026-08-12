@@ -287,10 +287,10 @@ export async function fetchSupabaseConfig(client: SupabaseClient): Promise<Confi
       { value: 'EHBO', label: 'EHBO' },
     ],
     priorities: [
-      { value: 'Critical', label: 'Critical' },
-      { value: 'Hoog', label: 'Hoog' },
-      { value: 'Middel', label: 'Middel' },
       { value: 'Laag', label: 'Laag' },
+      { value: 'Middel', label: 'Middel' },
+      { value: 'Hoog', label: 'Hoog' },
+      { value: 'Critical', label: 'Critical' },
     ],
     supportedActions: ['config', 'submit', 'incidents', 'update'],
     apiVersion: 3,

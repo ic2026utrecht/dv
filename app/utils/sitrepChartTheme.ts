@@ -6,9 +6,9 @@ export const PRIORITY_CHART_COLORS = {
 } as const
 
 export const DEPARTMENT_CHART_COLORS = {
-  Parkeer: '#2d2e7e',
+  Parkeer: '#f59e0b',
   Dienstverlening: '#6366f1',
-  EHBO: '#0ea5e9',
+  EHBO: '#10b981',
 } as const
 
 export const STATUS_CHART_COLORS = {

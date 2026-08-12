@@ -45,15 +45,58 @@ const {
   isChartVisible,
 } = useSitrepAnalyticsPrefs()
 
+const viewMode = ref<'live' | 'historical'>('live')
+const historicalDate = ref<Date>(new Date())
+const historicalHour = ref<number>(new Date().getHours())
+
 const bucketOptions: { value: SitrepAnalyticsBucket, label: string }[] = [
   { value: '30m', label: '30 min' },
   { value: '1h', label: '1 uur' },
   { value: '1d', label: '1 dag' },
 ]
 
-const timeline = computed(() => buildTimelineSeries(incidents.value, prefs.value.bucket))
+const hourOptions = computed(() =>
+  Array.from({ length: 24 }, (_, i) => ({
+    value: i,
+    label: `${String(i).padStart(2, '0')}:00`,
+  })),
+)
+
+const filteredIncidents = computed(() => {
+  if (viewMode.value === 'live') {
+    return incidents.value
+  }
+
+  const targetDate = new Date(historicalDate.value)
+  targetDate.setHours(historicalHour.value, 0, 0, 0)
+  const targetEnd = new Date(targetDate)
+  targetEnd.setHours(historicalHour.value + 1, 0, 0, 0)
+
+  return incidents.value.filter((incident) => {
+    const incidentTime = new Date(incident.timestamp)
+    return incidentTime >= targetDate && incidentTime < targetEnd
+  })
+})
+
+const historicalNow = computed(() => {
+  if (viewMode.value === 'live') {
+    return new Date()
+  }
+  const date = new Date(historicalDate.value)
+  date.setHours(historicalHour.value + 1, 0, 0, 0)
+  return date
+})
+
+const timeline = computed(() => 
+  buildTimelineSeries(
+    viewMode.value === 'live' ? filteredIncidents.value : incidents.value,
+    prefs.value.bucket,
+    historicalNow.value,
+  ),
+)
+
 const snapshot = computed(() =>
-  enrichSnapshotWithPeriod(buildAnalyticsSnapshot(incidents.value), timeline.value),
+  enrichSnapshotWithPeriod(buildAnalyticsSnapshot(filteredIncidents.value), timeline.value),
 )
 
 const visibleChartCount = computed(() =>
@@ -65,8 +108,23 @@ const hiddenCharts = computed(() =>
 )
 
 const dataRevision = computed(() =>
-  `${incidents.value.length}-${snapshot.value.totalOpen}-${prefs.value.bucket}`,
+  `${filteredIncidents.value.length}-${snapshot.value.totalOpen}-${prefs.value.bucket}-${viewMode.value}`,
 )
+
+function formatHistoricalPeriod(): string {
+  if (viewMode.value === 'live') {
+    return `Trend: ${getLookbackLabel(prefs.value.bucket)} · interval ${getBucketLabel(prefs.value.bucket)}`
+  }
+
+  const date = historicalDate.value.toLocaleDateString('nl-NL', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+  const hourLabel = `${String(historicalHour.value).padStart(2, '0')}:00-${String(historicalHour.value + 1).padStart(2, '0')}:00`
+  return `Historisch: ${date} ${hourLabel}`
+}
 
 const priorityDoughnutData = computed(() => ({
   labels: ANALYTICS_PRIORITY_LABELS,
@@ -179,6 +237,17 @@ const timelineDepartmentData = computed(() => ({
   })),
 }))
 
+const timelineClosedData = computed(() => ({
+  labels: timeline.value.labels,
+  datasets: [{
+    label: 'Afgesloten meldingen',
+    data: timeline.value.closedTotals,
+    borderColor: '#94a3b8',
+    backgroundColor: 'rgba(148, 163, 184, 0.15)',
+    fill: true,
+  }],
+}))
+
 function hideChart(id: SitrepAnalyticsChartId) {
   setChartVisible(id, false)
 }
@@ -211,12 +280,43 @@ function chartVisible(id: SitrepAnalyticsChartId) {
           </div>
         </div>
         <p class="ic-sitrep-analytics__period">
-          Trend: {{ getLookbackLabel(prefs.bucket) }} · interval {{ getBucketLabel(prefs.bucket) }}
+          {{ formatHistoricalPeriod() }}
         </p>
       </div>
 
       <div class="ic-sitrep-analytics__toolbar-actions">
         <SelectButton
+          v-model="viewMode"
+          :options="[
+            { value: 'live', label: 'Live' },
+            { value: 'historical', label: 'Historisch' }
+          ]"
+          option-label="label"
+          option-value="value"
+          aria-label="Weergavemodus"
+        />
+        
+        <template v-if="viewMode === 'historical'">
+          <DatePicker
+            v-model="historicalDate"
+            show-icon
+            icon-display="input"
+            date-format="dd-mm-yy"
+            placeholder="Datum"
+            class="ic-sitrep-analytics__date-picker"
+          />
+          <Select
+            v-model="historicalHour"
+            :options="hourOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Uur"
+            class="ic-sitrep-analytics__hour-select"
+          />
+        </template>
+        
+        <SelectButton
+          v-if="viewMode === 'live'"
           :model-value="prefs.bucket"
           :options="bucketOptions"
           option-label="label"
@@ -354,21 +454,6 @@ function chartVisible(id: SitrepAnalyticsChartId) {
       </SitrepAnalyticsChartCard>
 
       <SitrepAnalyticsChartCard
-        v-if="chartVisible('timeline-volume')"
-        title="Meldingen per interval"
-        description="Volume in de gekozen periode"
-        class="ic-sitrep-analytics__wide"
-        removable
-        @remove="hideChart('timeline-volume')"
-      >
-        <Line
-          :key="`timeline-${dataRevision}`"
-          :data="timelineLineData"
-          :options="lineOptions"
-        />
-      </SitrepAnalyticsChartCard>
-
-      <SitrepAnalyticsChartCard
         v-if="chartVisible('timeline-priority')"
         title="Trend per prioriteit"
         description="Nieuwe meldingen per interval"
@@ -395,6 +480,36 @@ function chartVisible(id: SitrepAnalyticsChartId) {
           :key="`timeline-department-${dataRevision}`"
           :data="timelineDepartmentData"
           :options="groupedBarOptions"
+        />
+      </SitrepAnalyticsChartCard>
+
+      <SitrepAnalyticsChartCard
+        v-if="chartVisible('timeline-volume')"
+        title="Meldingen per interval"
+        description="Volume in de gekozen periode"
+        class="ic-sitrep-analytics__wide"
+        removable
+        @remove="hideChart('timeline-volume')"
+      >
+        <Line
+          :key="`timeline-${dataRevision}`"
+          :data="timelineLineData"
+          :options="lineOptions"
+        />
+      </SitrepAnalyticsChartCard>
+
+      <SitrepAnalyticsChartCard
+        v-if="chartVisible('timeline-closed')"
+        title="Afgesloten incidenten"
+        description="Aantal afgesloten meldingen per interval"
+        class="ic-sitrep-analytics__wide"
+        removable
+        @remove="hideChart('timeline-closed')"
+      >
+        <Line
+          :key="`timeline-closed-${dataRevision}`"
+          :data="timelineClosedData"
+          :options="lineOptions"
         />
       </SitrepAnalyticsChartCard>
     </section>
@@ -496,6 +611,11 @@ function chartVisible(id: SitrepAnalyticsChartId) {
 
 .ic-sitrep-analytics__settings-btn:hover {
   background: rgb(135 161 198 / 0.12);
+}
+
+.ic-sitrep-analytics__date-picker,
+.ic-sitrep-analytics__hour-select {
+  min-width: 9rem;
 }
 
 .ic-sitrep-analytics__settings {

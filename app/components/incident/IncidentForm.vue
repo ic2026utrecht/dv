@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Department, Priority } from '~/types/models'
+import { PRIORITIES } from '~/constants/incident'
 
 const props = withDefaults(defineProps<{
   inDialog?: boolean
@@ -31,6 +32,7 @@ const ambulanceCalled = ref<'ja' | 'nee' | null>(null)
 
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
+const submitAttempted = ref(false)
 const rasterMapOpen = ref(false)
 
 onMounted(async () => {
@@ -76,7 +78,9 @@ const ambulanceOptions = [
 
 const isEhbo = computed(() => department.value === 'EHBO')
 
-const priorityOptions = computed(() => config.value?.priorities ?? [])
+const priorityOptions = computed(() =>
+  PRIORITIES.map(p => ({ value: p, label: p })),
+)
 
 const progressTotal = computed(() => (props.showDepartmentSelection ? 5 : 4))
 
@@ -115,7 +119,62 @@ const canSubmit = computed(() =>
   ),
 )
 
+type RequiredFieldKey =
+  | 'department'
+  | 'location'
+  | 'sector'
+  | 'priority'
+  | 'incidentType'
+  | 'description'
+  | 'personsInvolved'
+  | 'ambulanceCalled'
+
+const requiredFieldLabels: Record<RequiredFieldKey, string> = {
+  department: 'Afdeling',
+  location: 'Locatie',
+  sector: 'Raster sector',
+  priority: 'Prioriteit',
+  incidentType: 'Soort incident',
+  description: 'Korte omschrijving',
+  personsInvolved: 'Aantal betrokkenen',
+  ambulanceCalled: '112 gebeld?',
+}
+
+const fieldInvalid = computed(() => ({
+  department: props.showDepartmentSelection && !department.value,
+  location: !locationId.value,
+  sector: !parsedSector.value,
+  priority: !priority.value,
+  incidentType: Boolean(department.value) && !incidentTypeId.value,
+  description: !description.value.trim(),
+  personsInvolved: isEhbo.value && !personsInvolved.value,
+  ambulanceCalled: isEhbo.value && ambulanceCalled.value === null,
+}))
+
+const emptyFieldInvalid = (): Record<RequiredFieldKey, boolean> => ({
+  department: false,
+  location: false,
+  sector: false,
+  priority: false,
+  incidentType: false,
+  description: false,
+  personsInvolved: false,
+  ambulanceCalled: false,
+})
+
+const showFieldInvalid = computed(() =>
+  submitAttempted.value ? fieldInvalid.value : emptyFieldInvalid(),
+)
+
+const missingFields = computed(() =>
+  (Object.keys(requiredFieldLabels) as RequiredFieldKey[])
+    .filter(key => fieldInvalid.value[key])
+    .map(key => requiredFieldLabels[key]),
+)
+
 async function onSubmit() {
+  submitAttempted.value = true
+
   if (!canSubmit.value || !department.value || !locationId.value || !parsedSector.value
     || !incidentTypeId.value || !priority.value) {
     return
@@ -197,7 +256,9 @@ async function onSubmit() {
           <h2 class="ic-section-heading">
             Wie meldt dit incident?
           </h2>
-          <DepartmentTiles v-model="department" />
+          <div class="ic-field" :class="{ 'ic-field--invalid': showFieldInvalid.department }">
+            <DepartmentTiles v-model="department" />
+          </div>
         </section>
 
         <!-- Step 2: Location & priority -->
@@ -215,6 +276,7 @@ async function onSubmit() {
               html-for="location"
               required
               hint="Kies de dichtstbijzijnde hal, entree of zone"
+              :invalid="showFieldInvalid.location"
             >
               <Select
                 id="location"
@@ -233,6 +295,7 @@ async function onSubmit() {
               html-for="sector"
               required
               hint="Bijv. A1 of E7 — rij A t/m M, kolom 1 t/m 22"
+              :invalid="showFieldInvalid.sector"
             >
               <Select
                 id="sector"
@@ -267,6 +330,7 @@ async function onSubmit() {
               label="Prioriteit"
               required
               hint="Critical alleen bij direct gevaar of 112"
+              :invalid="showFieldInvalid.priority"
             >
               <ChoiceButtons
                 v-model="priority"
@@ -287,7 +351,7 @@ async function onSubmit() {
           </h2>
 
           <div class="grid gap-5">
-            <IcFormField label="Soort incident" html-for="incident-type" required>
+            <IcFormField label="Soort incident" html-for="incident-type" required :invalid="showFieldInvalid.incidentType">
               <Select
                 id="incident-type"
                 v-model="incidentTypeId"
@@ -301,7 +365,7 @@ async function onSubmit() {
             </IcFormField>
 
             <template v-if="isEhbo">
-              <IcFormField label="Aantal betrokkenen" html-for="persons" required>
+              <IcFormField label="Aantal betrokkenen" html-for="persons" required :invalid="showFieldInvalid.personsInvolved">
                 <Select
                   id="persons"
                   v-model="personsInvolved"
@@ -313,7 +377,7 @@ async function onSubmit() {
                 />
               </IcFormField>
 
-              <IcFormField label="112 gebeld?" required>
+              <IcFormField label="112 gebeld?" required :invalid="showFieldInvalid.ambulanceCalled">
                 <ChoiceButtons
                   v-model="ambulanceCalled"
                   :options="ambulanceOptions"
@@ -364,7 +428,8 @@ async function onSubmit() {
             label="Korte omschrijving"
             html-for="description"
             required
-            hint="Eén zin: wat gebeurt er, op dit moment?"
+            hint="Eén zin: wat gebeurt er, op dit moment? (GEEN PERSOONSGEGEVENS)"
+            :invalid="showFieldInvalid.description"
           >
             <Textarea
               id="description"
@@ -385,16 +450,28 @@ async function onSubmit() {
       <!-- Sticky submit -->
       <div class="ic-submit-bar" :class="{ 'ic-submit-bar--dialog': props.inDialog }">
         <div class="ic-submit-inner">
-          <p class="text-center text-sm font-semibold" :class="canSubmit ? 'text-[var(--ic-brand)]' : 'text-slate-600'">
-            {{ canSubmit ? 'Klaar om te versturen' : 'Vul alle verplichte velden in' }}
+          <p
+            v-if="canSubmit"
+            class="text-center text-sm font-semibold text-[var(--ic-orange)]"
+          >
+            Klaar om te versturen
           </p>
+          <div v-else-if="submitAttempted" class="text-center text-sm" aria-live="polite">
+            <p class="font-semibold text-slate-600">
+              Nog invullen:
+            </p>
+            <p class="mt-1 font-semibold text-red-600">
+              {{ missingFields.join(' · ') }}
+            </p>
+          </div>
           <Button
             type="submit"
             label="Melding versturen"
             icon="pi pi-send"
             fluid
+            size="large"
             :loading="submitting"
-            :disabled="!canSubmit || submitting"
+            :disabled="submitting"
           />
         </div>
       </div>

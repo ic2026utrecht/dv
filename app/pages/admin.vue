@@ -101,6 +101,12 @@ async function saveEdit() {
     return
   }
 
+  const trimmedPin = editPin.value.trim()
+  if (trimmedPin && !/^\d{4}$/.test(trimmedPin)) {
+    editError.value = 'PIN moet 4 cijfers zijn'
+    return
+  }
+
   savingEdit.value = true
   try {
     await updateStaff({
@@ -108,7 +114,7 @@ async function saveEdit() {
       firstName: editFirst.value.trim(),
       lastName: editLast.value.trim(),
       phone: editPhone.value,
-      pin: editPin.value.trim() || undefined,
+      pin: trimmedPin || undefined,
       isAdmin: editIsAdmin.value,
     })
     editVisible.value = false
@@ -327,6 +333,7 @@ function roleLabel(row: Staff): string {
       modal
       header="Medewerker bewerken"
       class="w-full max-w-md"
+      :dismissable-mask="true"
     >
       <div class="space-y-3">
         <div>
@@ -356,7 +363,7 @@ function roleLabel(row: Staff): string {
           />
         </div>
         <div>
-          <label class="ic-label" for="edit-pin">Nieuwe PIN (optioneel)</label>
+          <label class="ic-label" for="edit-pin">Nieuwe PIN (optioneel, 4 cijfers)</label>
           <p class="ic-label-hint">
             Leeg laten om de huidige PIN te behouden.
           </p>
@@ -366,7 +373,8 @@ function roleLabel(row: Staff): string {
             class="ic-field"
             type="password"
             inputmode="numeric"
-            maxlength="6"
+            maxlength="4"
+            pattern="\d{4}"
           />
         </div>
         <div class="flex items-center gap-2">
@@ -408,6 +416,7 @@ function roleLabel(row: Staff): string {
       modal
       header="Verwijderen?"
       class="w-full max-w-sm"
+      :dismissable-mask="true"
     >
       <p class="text-sm text-slate-700">
         Verwijder

@@ -79,9 +79,6 @@ watch(
     Object.assign(form, incidentToEditForm(incident, config.value))
     await fetchMe().catch(() => {})
     if (displayName.value) {
-      if (!form.actionOwner.trim()) {
-        form.actionOwner = displayName.value
-      }
       if (form.status === 'Afgesloten' && !form.closedBy.trim()) {
         form.closedBy = displayName.value
       }
@@ -203,6 +200,7 @@ function submit() {
     class="ic-sitrep-edit-dialog"
     :style="{ width: 'min(100vw - 2rem, 72rem)' }"
     :draggable="false"
+    :dismissable-mask="true"
     block-scroll
     content-class="ic-sitrep-edit-dialog__content"
     @hide="close"
@@ -422,29 +420,12 @@ function submit() {
           </IcFormField>
         </section>
 
-        <section v-if="isClosed" class="ic-sitrep-edit-dialog__section">
-          <h3 class="ic-sitrep-edit-dialog__heading">
-            Afsluiting
-          </h3>
-
-          <IcFormField label="Afgesloten door" html-for="sitrep-edit-closed-by">
-            <InputText
-              id="sitrep-edit-closed-by"
-              v-model="form.closedBy"
-              class="ic-field w-full"
-            />
-          </IcFormField>
-
-          <IcFormField label="Afsluiting / resultaat" html-for="sitrep-edit-closure-result" class="mt-4">
-            <Textarea
-              id="sitrep-edit-closure-result"
-              v-model="form.closureResult"
-              class="ic-field w-full"
-              rows="3"
-              auto-resize
-            />
-          </IcFormField>
-        </section>
+        <SitrepIncidentClosureFields
+          v-if="isClosed"
+          v-model:closed-by="form.closedBy"
+          v-model:closure-result="form.closureResult"
+          id-prefix="sitrep-edit"
+        />
 
         </div>
 
