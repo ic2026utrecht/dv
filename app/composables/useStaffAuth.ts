@@ -100,7 +100,7 @@ export function useStaffAuth() {
 
   async function login(phoneInput: string, pin: string) {
     const phone = normalizePhone(phoneInput)
-    if (!isValidPin(pin)) throw new Error('PIN moet 4–6 cijfers zijn')
+    if (!isValidPin(pin)) throw new Error('PIN moet 6 cijfers zijn')
     const result = await callStaffAuth({ action: 'login', phone, pin })
     await applySession(result.session)
     if (result.staff) staff.value = result.staff
@@ -109,7 +109,7 @@ export function useStaffAuth() {
 
   async function changePin(currentPin: string, newPin: string) {
     if (!isValidPin(currentPin) || !isValidPin(newPin)) {
-      throw new Error('PIN moet 4–6 cijfers zijn')
+      throw new Error('PIN moet 6 cijfers zijn')
     }
     const result = await callStaffAuth(
       { action: 'change-pin', currentPin, newPin },
@@ -153,7 +153,7 @@ export function useStaffAuth() {
     pin: string
     isAdmin?: boolean
   }) {
-    if (!isValidPin(payload.pin)) throw new Error('PIN moet 4–6 cijfers zijn')
+    if (!isValidPin(payload.pin)) throw new Error('PIN moet 6 cijfers zijn')
     const result = await callStaffAuth({
       action: 'add-staff',
       firstName: payload.firstName,

@@ -171,7 +171,7 @@ async function handleLogin(body: Record<string, unknown>) {
   const phone = normalizePhone(body.phone)
   const pin = body.pin
   if (!isValidE164(phone)) return errorResponse('Ongeldig telefoonnummer')
-  if (!isValidPin(pin)) return errorResponse('PIN moet 4–6 cijfers zijn')
+  if (!isValidPin(pin)) return errorResponse('PIN moet 6 cijfers zijn')
 
   const service = getServiceClient()
   const { data: staff, error: staffError } = await service
@@ -212,7 +212,7 @@ async function handleChangePin(req: Request, body: Record<string, unknown>) {
   const currentPin = body.currentPin
   const newPin = body.newPin
   if (!isValidPin(currentPin)) return errorResponse('Huidige PIN is ongeldig')
-  if (!isValidPin(newPin)) return errorResponse('Nieuwe PIN moet 4–6 cijfers zijn')
+  if (!isValidPin(newPin)) return errorResponse('Nieuwe PIN moet 6 cijfers zijn')
   if (currentPin === newPin) return errorResponse('Nieuwe PIN moet anders zijn')
 
   const service = auth.service!
@@ -275,7 +275,7 @@ async function handleAddStaff(req: Request, body: Record<string, unknown>) {
 
   if (!firstName || !lastName) return errorResponse('Voor- en achternaam verplicht')
   if (!isValidE164(phone)) return errorResponse('Ongeldig telefoonnummer')
-  if (!isValidPin(pin)) return errorResponse('PIN moet 4–6 cijfers zijn')
+  if (!isValidPin(pin)) return errorResponse('PIN moet 6 cijfers zijn')
 
   const service = auth.service!
   const email = phoneToEmail(phone)
@@ -361,7 +361,7 @@ async function handleUpdateStaff(req: Request, body: Record<string, unknown>) {
 
   // Optional PIN reset (admin for others, or anyone for self)
   if (pin !== undefined && pin !== null && String(pin).trim() !== '') {
-    if (!isValidPin(pin)) return errorResponse('PIN moet 4–6 cijfers zijn')
+    if (!isValidPin(pin)) return errorResponse('PIN moet 6 cijfers zijn')
     if (!target.auth_user_id) {
       return errorResponse('Deze medewerker heeft nog geen login')
     }

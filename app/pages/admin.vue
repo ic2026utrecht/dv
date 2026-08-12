@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Staff } from '~/types/models'
 import { formatStaffName } from '~/utils/staffName'
-import { isValidE164, normalizePhone } from '~/utils/phone'
+import { isValidE164, isValidPin, normalizePhone } from '~/utils/phone'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
@@ -102,8 +102,8 @@ async function saveEdit() {
   }
 
   const trimmedPin = editPin.value.trim()
-  if (trimmedPin && !/^\d{4}$/.test(trimmedPin)) {
-    editError.value = 'PIN moet 4 cijfers zijn'
+  if (trimmedPin && !isValidPin(trimmedPin)) {
+    editError.value = 'PIN moet 6 cijfers zijn'
     return
   }
 
@@ -207,7 +207,7 @@ function roleLabel(row: Staff): string {
               />
             </div>
             <div class="sm:col-span-2">
-              <label class="ic-label" for="admin-pin">PIN (4–6 cijfers)</label>
+              <label class="ic-label" for="admin-pin">PIN (6 cijfers)</label>
               <p class="ic-label-hint">
                 Geef deze PIN door aan de medewerker — zij kunnen niet zelf een account maken.
               </p>
@@ -218,7 +218,7 @@ function roleLabel(row: Staff): string {
                 type="password"
                 inputmode="numeric"
                 maxlength="6"
-                pattern="\d{4,6}"
+                pattern="\d{6}"
                 required
               />
             </div>
@@ -363,7 +363,7 @@ function roleLabel(row: Staff): string {
           />
         </div>
         <div>
-          <label class="ic-label" for="edit-pin">Nieuwe PIN (optioneel, 4 cijfers)</label>
+          <label class="ic-label" for="edit-pin">Nieuwe PIN (optioneel, 6 cijfers)</label>
           <p class="ic-label-hint">
             Leeg laten om de huidige PIN te behouden.
           </p>
@@ -373,8 +373,8 @@ function roleLabel(row: Staff): string {
             class="ic-field"
             type="password"
             inputmode="numeric"
-            maxlength="4"
-            pattern="\d{4}"
+            maxlength="6"
+            pattern="\d{6}"
           />
         </div>
         <div class="flex items-center gap-2">

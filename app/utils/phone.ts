@@ -25,5 +25,5 @@ export function isValidE164(phone: string): boolean {
 }
 
 export function isValidPin(pin: string): boolean {
-  return /^\d{4,6}$/.test(pin)
+  return /^\d{6}$/.test(pin)
 }

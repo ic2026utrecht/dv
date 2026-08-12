@@ -141,7 +141,7 @@ function backToPhone() {
               PIN <span class="ic-required">*</span>
             </label>
             <p class="ic-label-hint">
-              PIN is door een admin ingesteld (4–6 cijfers).
+              PIN is door een admin ingesteld (6 cijfers).
             </p>
             <InputText
               id="login-pin"
@@ -151,7 +151,7 @@ function backToPhone() {
               inputmode="numeric"
               autocomplete="one-time-code"
               maxlength="6"
-              pattern="\d{4,6}"
+              pattern="\d{6}"
               required
             />
           </div>

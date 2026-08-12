@@ -180,10 +180,11 @@ async function savePin() {
               type="password"
               inputmode="numeric"
               maxlength="6"
+              pattern="\d{6}"
             />
           </div>
           <div>
-            <label class="ic-label" for="pin-new">Nieuwe PIN (4–6 cijfers)</label>
+            <label class="ic-label" for="pin-new">Nieuwe PIN (6 cijfers)</label>
             <InputText
               id="pin-new"
               v-model="newPin"
@@ -191,6 +192,7 @@ async function savePin() {
               type="password"
               inputmode="numeric"
               maxlength="6"
+              pattern="\d{6}"
             />
           </div>
           <div>
@@ -202,6 +204,7 @@ async function savePin() {
               type="password"
               inputmode="numeric"
               maxlength="6"
+              pattern="\d{6}"
             />
           </div>
 
