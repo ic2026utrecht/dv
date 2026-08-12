@@ -384,6 +384,33 @@ async function handleUpdateStaff(req: Request, body: Record<string, unknown>) {
     updates.is_admin = body.isAdmin
   }
 
+  if (body.phone !== undefined && body.phone !== null && String(body.phone).trim() !== '') {
+    if (!actor.is_admin) {
+      return errorResponse('Alleen admins mogen het telefoonnummer wijzigen', 403)
+    }
+    const newPhone = normalizePhone(body.phone)
+    if (!isValidE164(newPhone)) return errorResponse('Ongeldig telefoonnummer')
+    if (newPhone !== target.phone) {
+      const { data: existing, error: existingError } = await service
+        .from('staff')
+        .select('id')
+        .eq('phone', newPhone)
+        .maybeSingle()
+      if (existingError) throw new Error(existingError.message)
+      if (existing && existing.id !== id) {
+        return errorResponse('Dit telefoonnummer staat al op de lijst')
+      }
+      if (!target.auth_user_id) {
+        return errorResponse('Deze medewerker heeft nog geen login')
+      }
+      const { error: emailError } = await service.auth.admin.updateUserById(target.auth_user_id, {
+        email: phoneToEmail(newPhone),
+      })
+      if (emailError) throw new Error(emailError.message)
+      updates.phone = newPhone
+    }
+  }
+
   const { data, error } = await service
     .from('staff')
     .update(updates)

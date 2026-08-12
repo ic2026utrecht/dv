@@ -9,7 +9,7 @@ function onSubmitted(incidentId: string) {
 <template>
   <div class="ic-page">
     <div class="ic-shell">
-      <LayoutPageHeader
+      <PageHeader
         subtitle="Melding gaat direct naar het Sitrep-overzicht in Google Sheets"
         :step="1"
       />

@@ -8,13 +8,13 @@ const {
   fetchMe,
   updateStaff,
   changePin,
-  logout,
   displayName,
   isAdmin,
 } = useStaffAuth()
 
 const firstName = ref('')
 const lastName = ref('')
+const phone = ref('')
 const currentPin = ref('')
 const newPin = ref('')
 const confirmPin = ref('')
@@ -31,6 +31,7 @@ onMounted(async () => {
   if (staff.value) {
     firstName.value = staff.value.firstName
     lastName.value = staff.value.lastName
+    phone.value = staff.value.phone
   }
 })
 
@@ -38,13 +39,26 @@ async function saveProfile() {
   profileError.value = null
   profileMessage.value = null
   if (!staff.value) return
+
+  if (isAdmin.value && phone.value.trim()) {
+    const normalized = normalizePhone(phone.value)
+    if (!isValidE164(normalized)) {
+      profileError.value = 'Voer een geldig telefoonnummer in (bijv. 06… of +31…)'
+      return
+    }
+  }
+
   savingProfile.value = true
   try {
-    await updateStaff({
+    const payload: Parameters<typeof updateStaff>[0] = {
       id: staff.value.id,
       firstName: firstName.value.trim(),
       lastName: lastName.value.trim(),
-    })
+    }
+    if (isAdmin.value && phone.value.trim()) {
+      payload.phone = phone.value
+    }
+    await updateStaff(payload)
     profileMessage.value = 'Profiel opgeslagen'
   }
   catch (err) {
@@ -77,17 +91,12 @@ async function savePin() {
     savingPin.value = false
   }
 }
-
-async function onLogout() {
-  await logout()
-  await navigateTo('/login')
-}
 </script>
 
 <template>
   <div class="ic-page">
     <div class="ic-shell">
-      <LayoutPageHeader
+      <PageHeader
         title="Profiel"
         :subtitle="displayName || 'Je account'"
       />
@@ -102,10 +111,15 @@ async function onLogout() {
             <label class="ic-label" for="profile-phone">Telefoonnummer</label>
             <InputText
               id="profile-phone"
-              :model-value="staff?.phone ?? ''"
+              v-model="phone"
               class="ic-field"
-              disabled
+              :disabled="!isAdmin"
+              inputmode="tel"
+              autocomplete="tel"
             />
+            <p v-if="!isAdmin" class="ic-label-hint mt-1">
+              Alleen een admin kan het telefoonnummer wijzigen.
+            </p>
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
@@ -214,32 +228,6 @@ async function onLogout() {
             @click="savePin"
           />
         </section>
-
-        <div class="flex flex-wrap gap-2">
-          <NuxtLink to="/sitrep">
-            <Button
-              label="Sitrep"
-              icon="pi pi-chart-bar"
-              severity="secondary"
-              outlined
-            />
-          </NuxtLink>
-          <NuxtLink v-if="isAdmin" to="/admin">
-            <Button
-              label="Beheer medewerkers"
-              icon="pi pi-users"
-              severity="secondary"
-              outlined
-            />
-          </NuxtLink>
-          <Button
-            label="Uitloggen"
-            icon="pi pi-sign-out"
-            severity="danger"
-            outlined
-            @click="onLogout"
-          />
-        </div>
       </div>
     </div>
   </div>

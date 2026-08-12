@@ -76,7 +76,7 @@ function backToPhone() {
 <template>
   <div class="ic-page">
     <div class="ic-shell">
-      <LayoutPageHeader
+      <PageHeader
         title="Inloggen"
         subtitle="Alleen voor Sitrep-medewerkers (telefoon + PIN)"
       />

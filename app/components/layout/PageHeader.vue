@@ -8,7 +8,7 @@ defineProps<{
 }>()
 
 const route = useRoute()
-const { isLoggedIn, isAdmin, displayName, fetchMe, logout } = useStaffAuth()
+const { isAdmin, displayName, fetchMe, logout } = useStaffAuth()
 
 const showStaffNav = computed(() => {
   const path = route.path
@@ -18,82 +18,94 @@ const showStaffNav = computed(() => {
 })
 
 onMounted(() => {
-  if (isLoggedIn.value) {
+  if (showStaffNav.value) {
     fetchMe().catch(() => {})
   }
 })
 
-watch(isLoggedIn, (loggedIn) => {
-  if (loggedIn) fetchMe().catch(() => {})
+watch(showStaffNav, (visible) => {
+  if (visible) fetchMe().catch(() => {})
 })
 
 async function onLogout() {
   await logout()
   await navigateTo('/login')
 }
+
+function isActive(prefix: string): boolean {
+  return route.path.startsWith(prefix)
+}
 </script>
 
 <template>
-  <header class="ic-header-hero">
-    <div class="ic-header-brand">
-      <img
-        :src="ic2026Logo"
-        alt="IC2026 Congres Nederland"
-        class="ic-header-logo"
-        width="72"
-        height="88"
-      >
-      <div class="ic-header-copy">
-        <p class="ic-header-kicker">
-          IC2026 DV · Live registratie
-        </p>
-        <h1 class="ic-header-title">
-          {{ title ?? 'Incident melden' }}
-        </h1>
-        <p v-if="subtitle" class="ic-header-sub">
-          {{ subtitle }}
-        </p>
-        <div v-if="step" class="ic-header-step">
-          <span class="ic-step-badge">{{ step }}</span>
-          Vul alle verplichte velden in
+  <header class="ic-header-hero ic-header-hero--compact">
+    <div class="ic-header-top">
+      <div class="ic-header-brand">
+        <img
+          :src="ic2026Logo"
+          alt="IC2026 Congres Nederland"
+          class="ic-header-logo"
+          width="40"
+          height="49"
+        >
+        <div
+          v-if="!showStaffNav || step"
+          class="ic-header-copy"
+        >
+          <p
+            v-if="!showStaffNav"
+            class="ic-header-kicker"
+          >
+            IC2026 DV · Live registratie
+          </p>
+          <div v-if="step" class="ic-header-step">
+            <span class="ic-step-badge">{{ step }}</span>
+            Vul alle verplichte velden in
+          </div>
         </div>
       </div>
-    </div>
 
-    <nav
-      v-if="showStaffNav && isLoggedIn"
-      class="ic-header-nav"
-      aria-label="Account"
-    >
-      <span v-if="displayName" class="ic-header-nav__name">
-        {{ displayName }}
-      </span>
-      <NuxtLink
-        to="/sitrep"
-        class="ic-header-nav__link"
+      <nav
+        v-if="showStaffNav"
+        class="ic-staff-nav"
+        aria-label="Account navigatie"
       >
-        Sitrep
-      </NuxtLink>
-      <NuxtLink
-        v-if="isAdmin"
-        to="/admin"
-        class="ic-header-nav__link"
-      >
-        Medewerkers
-      </NuxtLink>
-      <NuxtLink
-        to="/profile"
-        class="ic-header-nav__link"
-      >
-        Profiel
-      </NuxtLink>
-      <button
-        type="button"
-        class="ic-header-nav__link ic-header-nav__button"
-        @click="onLogout"
-      >
-        Uitloggen
-      </button>
-    </nav>
+        <span
+          v-if="displayName"
+          class="ic-staff-nav__name"
+        >
+          {{ displayName }}
+        </span>
+        <NuxtLink
+          to="/sitrep"
+          class="ic-staff-nav__link"
+          :class="{ 'ic-staff-nav__link--active': isActive('/sitrep') }"
+        >
+          Sitrep
+        </NuxtLink>
+        <NuxtLink
+          to="/profile"
+          class="ic-staff-nav__link"
+          :class="{ 'ic-staff-nav__link--active': isActive('/profile') }"
+        >
+          Profiel
+        </NuxtLink>
+        <NuxtLink
+          v-if="isAdmin"
+          to="/admin"
+          class="ic-staff-nav__link"
+          :class="{ 'ic-staff-nav__link--active': isActive('/admin') }"
+        >
+          Users
+        </NuxtLink>
+        <button
+          type="button"
+          class="ic-staff-nav__link ic-staff-nav__button"
+          @click="onLogout"
+        >
+          Uitloggen
+        </button>
+      </nav>
+    </div>
   </header>
 </template>

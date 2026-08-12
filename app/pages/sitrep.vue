@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="ic-page ic-page--sitrep">
     <div class="ic-shell ic-shell--sitrep">
-      <LayoutPageHeader
+      <PageHeader
         title="Sitrep dashboard"
         subtitle="Live overzicht van open incidenten op de congreslocatie"
       />

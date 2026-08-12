@@ -292,25 +292,79 @@ body {
   border-bottom: 3px solid var(--ic-orange);
 }
 
-.ic-header-nav {
-  @apply mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/15 pt-3 text-sm;
+.ic-header-hero--compact {
+  @apply px-3 py-1.5 text-[var(--ic-brand-dark)];
+  background: rgb(45 46 126 / 0.2);
+  border-bottom: 1px solid rgb(45 46 126 / 0.12);
 }
 
-.ic-header-nav__name {
-  @apply mr-auto font-medium text-white/90;
+.ic-header-hero--compact .ic-header-top {
+  @apply items-center gap-2;
 }
 
-.ic-header-nav__link {
-  @apply text-white/80 underline-offset-2 hover:text-white hover:underline;
+.ic-header-hero--compact .ic-header-brand {
+  @apply items-center gap-2;
 }
 
-.ic-header-nav__button {
-  @apply cursor-pointer bg-transparent p-0;
-  font: inherit;
+.ic-header-hero--compact .ic-header-logo {
+  width: 2.25rem;
+}
+
+.ic-header-hero--compact .ic-header-copy {
+  @apply pt-0;
+}
+
+.ic-header-hero--compact .ic-header-kicker {
+  @apply text-[10px] leading-none;
+  color: var(--ic-brand-dark);
+  opacity: 0.75;
+}
+
+.ic-header-hero--compact .ic-header-step {
+  @apply mt-1 py-0.5 text-[10px];
+  background: rgb(45 46 126 / 0.08);
+  color: var(--ic-brand-dark);
+}
+
+.ic-header-hero--compact .ic-staff-nav__name {
+  @apply text-[var(--ic-brand-dark)] opacity-80;
+}
+
+.ic-header-hero--compact .ic-staff-nav__link {
+  @apply text-[var(--ic-brand-dark)] opacity-75 hover:text-[var(--ic-brand-dark)] hover:opacity-100;
+}
+
+.ic-header-hero--compact .ic-staff-nav__link--active {
+  @apply text-[var(--ic-brand-dark)] opacity-100;
+}
+
+.ic-header-top {
+  @apply flex items-start justify-between gap-3;
 }
 
 .ic-header-brand {
-  @apply flex items-start gap-4;
+  @apply flex min-w-0 flex-1 items-start gap-4;
+}
+
+.ic-staff-nav {
+  @apply flex max-w-[11rem] shrink-0 flex-col items-end gap-1 text-right text-sm sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-x-3 sm:gap-y-1;
+}
+
+.ic-staff-nav__name {
+  @apply w-full font-medium text-white/90 sm:w-auto;
+}
+
+.ic-staff-nav__link {
+  @apply text-white/85 underline-offset-2 hover:text-white hover:underline;
+}
+
+.ic-staff-nav__link--active {
+  @apply font-semibold text-white;
+}
+
+.ic-staff-nav__button {
+  @apply cursor-pointer bg-transparent p-0 text-left sm:text-right;
+  font: inherit;
 }
 
 .ic-header-logo {

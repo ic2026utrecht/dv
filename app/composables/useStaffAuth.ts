@@ -169,17 +169,22 @@ export function useStaffAuth() {
     id: string
     firstName: string
     lastName: string
+    phone?: string
     pin?: string
     isAdmin?: boolean
   }) {
-    const result = await callStaffAuth({
+    const body: Record<string, unknown> = {
       action: 'update-staff',
       id: payload.id,
       firstName: payload.firstName,
       lastName: payload.lastName,
       pin: payload.pin,
       isAdmin: payload.isAdmin,
-    }, true)
+    }
+    if (payload.phone !== undefined) {
+      body.phone = normalizePhone(payload.phone)
+    }
+    const result = await callStaffAuth(body, true)
     const updated = result.data as Staff
     if (staff.value?.id === updated.id) {
       staff.value = updated

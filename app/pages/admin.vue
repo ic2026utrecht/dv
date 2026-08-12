@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Staff } from '~/types/models'
 import { formatStaffName } from '~/utils/staffName'
-import { normalizePhone } from '~/utils/phone'
+import { isValidE164, normalizePhone } from '~/utils/phone'
 
 definePageMeta({ middleware: ['auth', 'admin'] })
 
@@ -25,6 +25,7 @@ const editVisible = ref(false)
 const editRow = ref<Staff | null>(null)
 const editFirst = ref('')
 const editLast = ref('')
+const editPhone = ref('')
 const editPin = ref('')
 const editIsAdmin = ref(false)
 const savingEdit = ref(false)
@@ -83,6 +84,7 @@ function openEdit(row: Staff) {
   editRow.value = row
   editFirst.value = row.firstName
   editLast.value = row.lastName
+  editPhone.value = row.phone
   editPin.value = ''
   editIsAdmin.value = Boolean(row.isAdmin)
   editError.value = null
@@ -92,12 +94,20 @@ function openEdit(row: Staff) {
 async function saveEdit() {
   if (!editRow.value) return
   editError.value = null
+
+  const normalizedPhone = normalizePhone(editPhone.value)
+  if (!isValidE164(normalizedPhone)) {
+    editError.value = 'Voer een geldig telefoonnummer in (bijv. 06… of +31…)'
+    return
+  }
+
   savingEdit.value = true
   try {
     await updateStaff({
       id: editRow.value.id,
       firstName: editFirst.value.trim(),
       lastName: editLast.value.trim(),
+      phone: editPhone.value,
       pin: editPin.value.trim() || undefined,
       isAdmin: editIsAdmin.value,
     })
@@ -143,7 +153,7 @@ function roleLabel(row: Staff): string {
 <template>
   <div class="ic-page" style="max-width: 48rem;">
     <div class="ic-shell">
-      <LayoutPageHeader
+      <PageHeader
         title="Medewerkers"
         subtitle="Accounts aanmaken met telefoon + PIN (alleen admins)"
       />
@@ -309,25 +319,6 @@ function roleLabel(row: Staff): string {
             </li>
           </ul>
         </section>
-
-        <div class="flex flex-wrap gap-2">
-          <NuxtLink to="/sitrep">
-            <Button
-              label="Sitrep"
-              icon="pi pi-chart-bar"
-              severity="secondary"
-              outlined
-            />
-          </NuxtLink>
-          <NuxtLink to="/profile">
-            <Button
-              label="Profiel"
-              icon="pi pi-user"
-              severity="secondary"
-              outlined
-            />
-          </NuxtLink>
-        </div>
       </div>
     </div>
 
@@ -338,9 +329,16 @@ function roleLabel(row: Staff): string {
       class="w-full max-w-md"
     >
       <div class="space-y-3">
-        <p class="text-sm text-slate-600">
-          {{ editRow?.phone }}
-        </p>
+        <div>
+          <label class="ic-label" for="edit-phone">Telefoonnummer</label>
+          <InputText
+            id="edit-phone"
+            v-model="editPhone"
+            class="ic-field"
+            inputmode="tel"
+            autocomplete="tel"
+          />
+        </div>
         <div>
           <label class="ic-label" for="edit-first">Voornaam</label>
           <InputText
