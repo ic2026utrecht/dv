@@ -27,7 +27,8 @@ body {
   @apply mx-auto min-h-screen w-full max-w-lg px-4 pb-32 pt-4;
 }
 
-.ic-page--sitrep {
+.ic-page--sitrep,
+.ic-page--whatsapp {
   @apply max-w-none px-0 pb-0 pt-0 min-h-screen;
 }
 
@@ -37,7 +38,8 @@ body {
   background: #fff;
 }
 
-.ic-shell--sitrep {
+.ic-shell--sitrep,
+.ic-shell--whatsapp {
   @apply mb-0 rounded-none border-x-0 shadow-none flex flex-col;
   height: 100dvh;
   max-height: 100dvh;

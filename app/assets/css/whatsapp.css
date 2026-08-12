@@ -1,14 +1,6 @@
-/* WhatsApp live feed — control room split view */
-
-.ic-page--whatsapp {
-  @apply max-w-none px-0 pb-0 pt-0 min-h-screen;
-}
-
-.ic-shell--whatsapp {
-  @apply mb-0 rounded-none border-x-0 shadow-none flex flex-col;
-  height: 100dvh;
-  max-height: 100dvh;
-}
+/* WhatsApp live feed — control room split view
+   Page/shell full-width overrides live in main.css (after .ic-page)
+   so they win over the form max-w-lg. */
 
 .ic-wa-status-bar {
   display: flex;

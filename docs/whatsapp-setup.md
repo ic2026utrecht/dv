@@ -12,12 +12,14 @@ Alleen admins mogen WhatsApp koppelen (QR scannen). Medewerkers zien de gedeelde
 
 Run Evolution API on a **persistent host** (VPS, Railway, Fly.io, etc.). It cannot run on GitHub Pages.
 
-Example Docker Compose:
+**Prefer Railway?** Follow the dedicated guide: **[whatsapp-railway.md](./whatsapp-railway.md)**.
+
+Example Docker Compose (VPS / local):
 
 ```yaml
 services:
   evolution-api:
-    image: atendai/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:v2.2.3
     restart: always
     ports:
       - "8080:8080"
