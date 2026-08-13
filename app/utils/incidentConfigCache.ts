@@ -1,6 +1,10 @@
 import type { IncidentConfig } from '~/types/models'
 
-const STORAGE_KEY = 'ic2026-incident-config'
+/** Bump when reference data shape/content changes so clients refetch config. */
+export const INCIDENT_CONFIG_API_VERSION = 4
+
+const STORAGE_KEY = 'ic2026-incident-config-v2'
+const LEGACY_STORAGE_KEY = 'ic2026-incident-config'
 export const INCIDENT_CONFIG_CACHE_TTL_MS = 60 * 60 * 1000
 
 interface CachedIncidentConfig {
@@ -14,7 +18,12 @@ function isIncidentConfig(value: unknown): value is IncidentConfig {
   }
 
   const config = value as IncidentConfig
-  return Array.isArray(config.locations) && Array.isArray(config.incidentTypes)
+  return (
+    Array.isArray(config.locations)
+    && Array.isArray(config.incidentTypes)
+    && Array.isArray(config.helpOptions)
+    && config.apiVersion === INCIDENT_CONFIG_API_VERSION
+  )
 }
 
 export function readIncidentConfigCache(): IncidentConfig | null {
@@ -23,6 +32,8 @@ export function readIncidentConfigCache(): IncidentConfig | null {
   }
 
   try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
+
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) {
       return null

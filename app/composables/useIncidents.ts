@@ -1,12 +1,17 @@
 import type { IncidentConfig, IncidentSubmission, IncidentSubmissionResult } from '~/types/models'
 import {
+  INCIDENT_CONFIG_API_VERSION,
   INCIDENT_CONFIG_CACHE_TTL_MS,
   readIncidentConfigCache,
   writeIncidentConfigCache,
 } from '~/utils/incidentConfigCache'
 
-function isStoreConfigFresh(loadedAt: number | null): boolean {
-  return loadedAt !== null && Date.now() - loadedAt < INCIDENT_CONFIG_CACHE_TTL_MS
+function isStoreConfigFresh(loadedAt: number | null, config: IncidentConfig | null): boolean {
+  return (
+    loadedAt !== null
+    && Date.now() - loadedAt < INCIDENT_CONFIG_CACHE_TTL_MS
+    && config?.apiVersion === INCIDENT_CONFIG_API_VERSION
+  )
 }
 
 export const useIncidents = () => {
@@ -17,7 +22,7 @@ export const useIncidents = () => {
     if (
       !refresh
       && store.config
-      && isStoreConfigFresh(store.loadedAt)
+      && isStoreConfigFresh(store.loadedAt, store.config)
     ) {
       return store.config
     }

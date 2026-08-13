@@ -21,6 +21,7 @@ import type {
   Priority,
 } from '~/types/models'
 import { PERSONS_COUNT_OPTIONS } from '~/constants/incident'
+import { INCIDENT_CONFIG_API_VERSION } from '~/utils/incidentConfigCache'
 import { RASTER_COLUMNS, RASTER_ROWS } from '~/utils/incidentOptions'
 
 export function assertSupabaseConfig(url: string, anonKey: string): void {
@@ -293,7 +294,7 @@ export async function fetchSupabaseConfig(client: SupabaseClient): Promise<Confi
       { value: 'Critical', label: 'Critical' },
     ],
     supportedActions: ['config', 'submit', 'incidents', 'update'],
-    apiVersion: 3,
+    apiVersion: INCIDENT_CONFIG_API_VERSION,
     locations,
     incidentTypes,
     helpOptions,
