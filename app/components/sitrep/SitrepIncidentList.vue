@@ -27,6 +27,9 @@ const activeFilterCount = computed(() => {
   if (filters.value.priority.length > 0) {
     count++
   }
+  if (filters.value.location.length > 0) {
+    count++
+  }
   if (
     filters.value.status.length !== DEFAULT_SITREP_LIST_FILTERS.status.length
     || filters.value.status.some((value, index) => value !== DEFAULT_SITREP_LIST_FILTERS.status[index])
@@ -327,6 +330,21 @@ async function handleStatusSave(payload: IncidentUpdate) {
   font-size: 0.8125rem;
   font-weight: 600;
   color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .ic-sitrep-list--panel {
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .ic-sitrep-list__scroll {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
 }
 
 @media (max-width: 900px) {

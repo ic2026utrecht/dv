@@ -448,3 +448,24 @@ export async function postSupabaseIncidentUpdate(
     },
   }
 }
+
+export async function deleteSupabaseIncidentUpdate(
+  client: SupabaseClient,
+  updateId: string,
+): Promise<void> {
+  const trimmedId = updateId.trim()
+  if (!trimmedId) {
+    throw new Error('Update-id verplicht')
+  }
+
+  const { data, error } = await client
+    .from('incident_updates')
+    .delete()
+    .eq('id', trimmedId)
+    .select('id')
+
+  if (error) throw new Error(error.message)
+  if (!data?.length) {
+    throw new Error('Update niet gevonden of geen rechten om te verwijderen')
+  }
+}

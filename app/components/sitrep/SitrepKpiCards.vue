@@ -53,19 +53,22 @@ const chips = [
       <button
         type="button"
         class="ic-sitrep-kpis__create"
+        aria-label="Nieuwe melding"
         @click="emit('create')"
       >
         <i class="pi pi-plus" aria-hidden="true" />
-        Nieuwe melding
+        <span class="ic-sitrep-kpis__label-full">Nieuwe melding</span>
+        <span class="ic-sitrep-kpis__label-short">Nieuw</span>
       </button>
       <button
         type="button"
         class="ic-sitrep-kpis__refresh"
+        aria-label="Vernieuwen"
         :disabled="refreshing || loading"
         @click="emit('refresh')"
       >
         <i class="pi pi-refresh" :class="{ 'pi-spin': refreshing || loading }" aria-hidden="true" />
-        Vernieuwen
+        <span class="ic-sitrep-kpis__label-full">Vernieuwen</span>
       </button>
     </div>
   </section>
@@ -205,13 +208,77 @@ const chips = [
   cursor: not-allowed;
 }
 
-@media (max-width: 768px) {
+.ic-sitrep-kpis__label-short {
+  display: none;
+}
+
+@media (max-width: 900px) {
   .ic-sitrep-kpis {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4375rem 0.625rem;
+  }
+
+  .ic-sitrep-kpis__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    gap: 0.375rem;
+  }
+
+  .ic-sitrep-kpis__row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.375rem;
+    scrollbar-width: none;
+  }
+
+  .ic-sitrep-kpis__row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ic-sitrep-kpi-chip__label {
+    display: none;
+  }
+
+  .ic-sitrep-kpi-chip__dot {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.625rem;
+  }
+
+  .ic-sitrep-kpis__updated {
+    font-size: 0.5625rem;
   }
 
   .ic-sitrep-kpis__actions {
-    width: 100%;
+    width: auto;
+    gap: 0.3125rem;
+  }
+
+  .ic-sitrep-kpis__create,
+  .ic-sitrep-kpis__refresh {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.6875rem;
+  }
+
+  .ic-sitrep-kpis__label-full {
+    display: none;
+  }
+
+  .ic-sitrep-kpis__label-short {
+    display: inline;
+  }
+}
+
+@media (max-width: 768px) {
+  .ic-sitrep-kpis {
+    flex-wrap: nowrap;
+  }
+
+  .ic-sitrep-kpis__actions {
+    width: auto;
     justify-content: flex-end;
   }
 }

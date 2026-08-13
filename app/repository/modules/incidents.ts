@@ -16,6 +16,7 @@ import {
   fetchSupabaseIncidentUpdates,
   postSupabaseIncident,
   postSupabaseIncidentUpdate,
+  deleteSupabaseIncidentUpdate,
 } from '~/utils/supabaseApi'
 
 class IncidentsModule {
@@ -62,6 +63,11 @@ class IncidentsModule {
   async getUpdateHistory(incidentId: string): Promise<IncidentUpdateHistoryResponse> {
     this.assertConfigured()
     return await fetchSupabaseIncidentUpdates(this.client, incidentId)
+  }
+
+  async deleteUpdate(updateId: string): Promise<void> {
+    this.assertConfigured()
+    await deleteSupabaseIncidentUpdate(this.client, updateId)
   }
 }
 

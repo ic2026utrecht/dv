@@ -119,7 +119,7 @@ watch(visible, (open) => {
   }
 })
 
-function handleNoteAdded() {
+function handleFeedChanged() {
   updatesRefreshKey.value += 1
 }
 
@@ -191,7 +191,15 @@ function submit() {
     return
   }
 
-  emit('save', editFormToIncidentUpdate(props.incident.incidentId, form))
+  const payload = editFormToIncidentUpdate(props.incident.incidentId, form)
+  const actor = displayName.value?.trim()
+    || (form.status === 'Afgesloten' ? form.closedBy.trim() : '')
+    || form.actionOwner.trim()
+  if (actor) {
+    payload.updatedBy = actor
+  }
+
+  emit('save', payload)
 }
 </script>
 
@@ -451,7 +459,8 @@ function submit() {
                 <SitrepIncidentUpdateFeed
                   :incident="incident"
                   :refresh-key="updatesRefreshKey"
-                  @note-added="handleNoteAdded"
+                  @note-added="handleFeedChanged"
+                  @update-deleted="handleFeedChanged"
                 />
               </aside>
             </TabPanel>

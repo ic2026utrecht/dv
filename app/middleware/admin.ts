@@ -1,7 +1,7 @@
 export default defineNuxtRouteMiddleware(async () => {
   const user = useSupabaseUser()
   if (!user.value) {
-    return navigateTo('/login?redirect=/admin')
+    return navigateTo('/login?redirect=/admin/users')
   }
 
   const { fetchMe, isAdmin } = useStaffAuth()

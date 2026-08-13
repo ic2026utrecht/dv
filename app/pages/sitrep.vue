@@ -62,31 +62,33 @@ onBeforeUnmount(() => {
         subtitle="Live overzicht van open incidenten op de congreslocatie"
       />
 
-      <Message v-if="error" severity="error" class="ic-sitrep-error">
-        {{ error }}
-      </Message>
+      <div class="ic-sitrep-body">
+        <Message v-if="error" severity="error" class="ic-sitrep-error">
+          {{ error }}
+        </Message>
 
-      <Message
-        v-else-if="apiConfig && !canUpdateIncidents"
-        severity="warn"
-        class="ic-sitrep-error"
-        :closable="false"
-      >
-        Status wijzigen werkt nog niet: de Sheets API moet opnieuw gedeployed worden.
-        Kopieer <code>apps-script/Api.gs</code> naar Apps Script, ga naar
-        <strong>Deploy → Manage deployments → Edit → New version → Deploy</strong>.
-      </Message>
+        <Message
+          v-else-if="apiConfig && !canUpdateIncidents"
+          severity="warn"
+          class="ic-sitrep-error"
+          :closable="false"
+        >
+          Status wijzigen werkt nog niet: de Sheets API moet opnieuw gedeployed worden.
+          Kopieer <code>apps-script/Api.gs</code> naar Apps Script, ga naar
+          <strong>Deploy → Manage deployments → Edit → New version → Deploy</strong>.
+        </Message>
 
-      <SitrepKpiCards
-        :summary="summary"
-        :last-updated="lastUpdated"
-        :loading="loading"
-        :refreshing="refreshing"
-        @create="createDialogOpen = true"
-        @refresh="refresh"
-      />
+        <SitrepKpiCards
+          :summary="summary"
+          :last-updated="lastUpdated"
+          :loading="loading"
+          :refreshing="refreshing"
+          @create="createDialogOpen = true"
+          @refresh="refresh"
+        />
 
-      <SitrepMainTabs />
+        <SitrepMainTabs />
+      </div>
     </div>
 
     <SitrepIncidentCreateDialog
@@ -99,5 +101,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .ic-sitrep-error {
   margin: 1rem;
+}
+
+@media (max-width: 900px) {
+  .ic-sitrep-error {
+    margin: 0.5rem 0.75rem;
+  }
 }
 </style>

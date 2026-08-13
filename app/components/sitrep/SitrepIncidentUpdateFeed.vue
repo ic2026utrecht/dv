@@ -8,10 +8,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   noteAdded: []
+  updateDeleted: []
 }>()
 
 const { $api } = useNuxtApp()
-const { updateIncident } = useSitrep()
+const { updateIncident, refreshIncidents } = useSitrep()
 const { displayName, fetchMe } = useStaffAuth()
 
 const entries = ref<IncidentUpdateEntry[]>([])
@@ -21,6 +22,11 @@ const error = ref<string | null>(null)
 const note = ref('')
 const author = ref('')
 const feedRef = ref<HTMLElement | null>(null)
+
+const confirmVisible = ref(false)
+const deleteTarget = ref<IncidentUpdateEntry | null>(null)
+const deletePreview = ref('')
+const deleting = ref(false)
 
 type FeedItem
   = | { kind: 'date', key: string, label: string }
@@ -98,6 +104,53 @@ function messageText(entry: IncidentUpdateEntry, index: number): string | null {
 
 function statusChanged(entry: IncidentUpdateEntry): boolean {
   return Boolean(entry.previousStatus && entry.status !== entry.previousStatus)
+}
+
+function entryIndex(entry: IncidentUpdateEntry): number {
+  return entries.value.findIndex(item => item.id === entry.id)
+}
+
+function deletePreviewLabel(entry: IncidentUpdateEntry): string {
+  const index = entryIndex(entry)
+  if (statusChanged(entry)) {
+    return `Statuswijziging: ${entry.previousStatus} → ${entry.status}`
+  }
+  const text = index >= 0 ? messageText(entry, index) : entry.notes.trim()
+  return text || 'Update'
+}
+
+function askDelete(entry: IncidentUpdateEntry) {
+  deleteTarget.value = entry
+  deletePreview.value = deletePreviewLabel(entry)
+  confirmVisible.value = true
+}
+
+async function confirmDelete() {
+  if (!deleteTarget.value || deleting.value) {
+    return
+  }
+
+  const deletedId = deleteTarget.value.id
+  deleting.value = true
+  error.value = null
+
+  try {
+    await $api.incidents.deleteUpdate(deletedId)
+    entries.value = entries.value.filter(entry => entry.id !== deletedId)
+    confirmVisible.value = false
+    deleteTarget.value = null
+    emit('updateDeleted')
+    await refreshIncidents()
+    await loadHistory()
+  }
+  catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : 'Update verwijderen mislukt'
+    confirmVisible.value = false
+    await loadHistory()
+  }
+  finally {
+    deleting.value = false
+  }
 }
 
 const feedItems = computed<FeedItem[]>(() => {
@@ -265,19 +318,47 @@ watch(displayName, (name) => {
             v-else-if="item.kind === 'status'"
             class="ic-update-feed__system"
           >
-            <span :class="['ic-update-feed__status', statusBadgeClass(item.entry.status)]">
-              {{ item.entry.previousStatus }} → {{ item.entry.status }}
-            </span>
-            <time>{{ formatTime(item.entry.createdAt) }}</time>
+            <div class="ic-update-feed__item-actions">
+              <span :class="['ic-update-feed__status', statusBadgeClass(item.entry.status)]">
+                {{ item.entry.previousStatus }} → {{ item.entry.status }}
+              </span>
+              <button
+                type="button"
+                class="ic-update-feed__delete"
+                aria-label="Statusupdate verwijderen"
+                title="Verwijderen"
+                :disabled="deleting"
+                @click="askDelete(item.entry)"
+              >
+                <i class="pi pi-trash" aria-hidden="true" />
+              </button>
+            </div>
+            <footer v-if="item.entry.updatedBy" class="ic-update-feed__system-meta">
+              <span class="ic-update-feed__author">{{ item.entry.updatedBy }}</span>
+              <time>{{ formatTime(item.entry.createdAt) }}</time>
+            </footer>
+            <time v-else>{{ formatTime(item.entry.createdAt) }}</time>
           </div>
 
           <article
             v-else
             class="ic-update-feed__bubble"
           >
-            <p class="ic-update-feed__text">
-              {{ item.text }}
-            </p>
+            <div class="ic-update-feed__bubble-head">
+              <p class="ic-update-feed__text">
+                {{ item.text }}
+              </p>
+              <button
+                type="button"
+                class="ic-update-feed__delete"
+                aria-label="Update verwijderen"
+                title="Verwijderen"
+                :disabled="deleting"
+                @click="askDelete(item.entry)"
+              >
+                <i class="pi pi-trash" aria-hidden="true" />
+              </button>
+            </div>
             <footer class="ic-update-feed__meta">
               <span v-if="item.entry.updatedBy" class="ic-update-feed__author">
                 {{ item.entry.updatedBy }}
@@ -324,6 +405,43 @@ watch(displayName, (name) => {
         />
       </div>
     </form>
+
+    <Dialog
+      v-model:visible="confirmVisible"
+      modal
+      header="Update verwijderen?"
+      class="w-full max-w-sm"
+      :dismissable-mask="true"
+    >
+      <p class="text-sm text-slate-700">
+        Weet je zeker dat je deze update wilt verwijderen?
+      </p>
+      <p class="mt-2 rounded-lg border border-[rgb(135_161_198/0.35)] bg-slate-50 px-3 py-2 text-sm text-[var(--ic-brand-dark)]">
+        {{ deletePreview }}
+      </p>
+      <p
+        v-if="entries.length === 1"
+        class="mt-2 text-xs text-slate-500"
+      >
+        Dit is de enige update voor dit incident. Het incident zelf blijft bestaan.
+      </p>
+      <template #footer>
+        <Button
+          label="Annuleren"
+          severity="secondary"
+          text
+          :disabled="deleting"
+          @click="confirmVisible = false"
+        />
+        <Button
+          label="Verwijderen"
+          severity="danger"
+          icon="pi pi-trash"
+          :loading="deleting"
+          @click="confirmDelete"
+        />
+      </template>
+    </Dialog>
   </section>
 </template>
 
@@ -417,6 +535,59 @@ watch(displayName, (name) => {
   color: #64748b;
 }
 
+.ic-update-feed__item-actions,
+.ic-update-feed__bubble-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  width: 100%;
+}
+
+.ic-update-feed__item-actions {
+  justify-content: center;
+}
+
+.ic-update-feed__bubble-head {
+  justify-content: space-between;
+}
+
+.ic-update-feed__delete {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.ic-update-feed__delete:hover,
+.ic-update-feed__delete:focus-visible {
+  color: var(--ic-crimson);
+  background: rgb(186 49 72 / 0.08);
+  outline: none;
+}
+
+.ic-update-feed__delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ic-update-feed__system-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.625rem;
+}
+
 .ic-update-feed__status {
   display: inline-flex;
   align-items: center;
@@ -459,6 +630,8 @@ watch(displayName, (name) => {
 
 .ic-update-feed__text {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   font-size: 0.8125rem;
   line-height: 1.45;
   color: #1e293b;

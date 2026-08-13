@@ -3,12 +3,13 @@ import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
 
 export type SitrepStatusValue = 'open' | 'Open' | 'In behandeling' | 'Afgesloten'
 export type SitrepSortKey = 'priority' | 'newest' | 'oldest' | 'age'
-export type SitrepView = 'map' | 'timeline' | 'analytics'
+export type SitrepView = 'map' | 'table' | 'timeline' | 'analytics'
 
 export interface SitrepListFilters {
   department: Department[]
   priority: Priority[]
   status: SitrepStatusValue[]
+  location: string[]
   sort: SitrepSortKey
 }
 
@@ -16,6 +17,7 @@ export const DEFAULT_SITREP_LIST_FILTERS: SitrepListFilters = {
   department: [],
   priority: [],
   status: ['open'],
+  location: [],
   sort: 'priority',
 }
 
@@ -76,6 +78,14 @@ function parseStatusFilter(query: Record<string, string | string[] | null | unde
   return values.filter(isStatusValue)
 }
 
+function parseLocationFilter(query: Record<string, string | string[] | null | undefined>): string[] {
+  const values = queryValues(query.location)
+  if (values.length === 0 || values.includes('all')) {
+    return DEFAULT_SITREP_LIST_FILTERS.location
+  }
+  return values
+}
+
 function isSortKey(value: string): value is SitrepSortKey {
   return (SORT_KEYS as readonly string[]).includes(value)
 }
@@ -89,6 +99,7 @@ export function parseSitrepFiltersFromQuery(
     department: parseDepartmentFilter(query),
     priority: parsePriorityFilter(query),
     status: parseStatusFilter(query),
+    location: parseLocationFilter(query),
     sort: sort && isSortKey(sort) ? sort : DEFAULT_SITREP_LIST_FILTERS.sort,
   }
 }
@@ -97,6 +108,9 @@ export function parseSitrepViewFromQuery(
   query: Record<string, string | string[] | null | undefined>,
 ): SitrepView {
   const value = queryValue(query.view)
+  if (value === 'table') {
+    return 'table'
+  }
   if (value === 'timeline') {
     return 'timeline'
   }
@@ -118,6 +132,9 @@ export function buildSitrepQuery(
   if (filters.priority.length > 0) {
     query.priority = filters.priority.join(',')
   }
+  if (filters.location.length > 0) {
+    query.location = filters.location.join(',')
+  }
   if (!arraysEqual(filters.status, DEFAULT_SITREP_LIST_FILTERS.status)) {
     query.status = filters.status.length > 0 ? filters.status.join(',') : 'all'
   }
@@ -138,6 +155,7 @@ export function stripSitrepQueryKeys(
   delete next.dept
   delete next.priority
   delete next.status
+  delete next.location
   delete next.sort
   delete next.view
   return next
@@ -174,6 +192,23 @@ function matchesStatus(incident: Incident, filters: SitrepStatusValue[]): boolea
   })
 }
 
+function matchesLocation(
+  incident: Incident,
+  locationIds: string[],
+  locationNamesById: Record<string, string> = {},
+): boolean {
+  if (locationIds.length === 0) {
+    return true
+  }
+  if (incident.locationId && locationIds.includes(incident.locationId)) {
+    return true
+  }
+  const selectedNames = locationIds
+    .map(id => locationNamesById[id])
+    .filter(Boolean)
+  return selectedNames.includes(incident.locationName)
+}
+
 function compareIncidents(a: Incident, b: Incident, sort: SitrepSortKey): number {
   switch (sort) {
     case 'newest':
@@ -196,12 +231,14 @@ function compareIncidents(a: Incident, b: Incident, sort: SitrepSortKey): number
 export function filterAndSortIncidents(
   incidents: Incident[],
   filters: SitrepListFilters,
+  locationNamesById: Record<string, string> = {},
 ): Incident[] {
   return incidents
     .filter(incident =>
       matchesDepartment(incident, filters.department)
       && matchesPriority(incident, filters.priority)
-      && matchesStatus(incident, filters.status),
+      && matchesStatus(incident, filters.status)
+      && matchesLocation(incident, filters.location, locationNamesById),
     )
     .sort((a, b) => compareIncidents(a, b, filters.sort))
 }

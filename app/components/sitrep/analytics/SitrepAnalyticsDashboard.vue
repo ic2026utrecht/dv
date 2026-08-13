@@ -27,6 +27,7 @@ import {
 } from '~/composables/useSitrepAnalyticsPrefs'
 
 const { incidents } = useSitrep()
+const { filterIncidents } = useSitrepQuery()
 
 const doughnutOptions = doughnutChartOptions()
 const barOptions = barChartOptions()
@@ -62,7 +63,7 @@ const hourOptions = computed(() =>
   })),
 )
 
-const filteredIncidents = computed(() => {
+const timeFilteredIncidents = computed(() => {
   if (viewMode.value === 'live') {
     return incidents.value
   }
@@ -78,6 +79,10 @@ const filteredIncidents = computed(() => {
   })
 })
 
+const filteredIncidents = computed(() =>
+  filterIncidents(timeFilteredIncidents.value),
+)
+
 const historicalNow = computed(() => {
   if (viewMode.value === 'live') {
     return new Date()
@@ -87,9 +92,9 @@ const historicalNow = computed(() => {
   return date
 })
 
-const timeline = computed(() => 
+const timeline = computed(() =>
   buildTimelineSeries(
-    viewMode.value === 'live' ? filteredIncidents.value : incidents.value,
+    filteredIncidents.value,
     prefs.value.bucket,
     historicalNow.value,
   ),
@@ -334,6 +339,10 @@ function chartVisible(id: SitrepAnalyticsChartId) {
         </button>
       </div>
     </header>
+
+    <section class="ic-sitrep-analytics__filters">
+      <SitrepIncidentListFilters id-prefix="analytics-" :show-sort="false" />
+    </section>
 
     <section v-if="settingsOpen" class="ic-sitrep-analytics__settings">
       <div class="ic-sitrep-analytics__settings-head">
@@ -593,6 +602,23 @@ function chartVisible(id: SitrepAnalyticsChartId) {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+
+.ic-sitrep-analytics__filters {
+  padding: 0.75rem;
+  border: 1px solid rgb(135 161 198 / 0.25);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.ic-sitrep-analytics__filters :deep(.ic-sitrep-list-filters) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 901px) {
+  .ic-sitrep-analytics__filters :deep(.ic-sitrep-list-filters) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .ic-sitrep-analytics__settings-btn {

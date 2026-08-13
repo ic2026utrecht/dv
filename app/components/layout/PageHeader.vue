@@ -36,7 +36,7 @@ const staffNavLinks = computed((): StaffNavLink[] => {
   ]
 
   if (isAdmin.value) {
-    links.push({ to: '/admin', label: 'Users' })
+    links.push({ to: '/admin', label: 'Admin' })
   }
 
   return links
@@ -318,6 +318,19 @@ function onNavClick() {
 
   .ic-staff-nav__menu-btn {
     display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ic-header-hero--compact {
+    padding-top: 0.3125rem;
+    padding-bottom: 0.3125rem;
+  }
+
+  .ic-staff-nav__menu-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.9375rem;
   }
 }
 </style>

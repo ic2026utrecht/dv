@@ -27,6 +27,11 @@ const mapIncidentCount = computed(() =>
           Kaart
           <span class="ic-sitrep-tabs__badge">{{ filteredIncidents.length }}</span>
         </Tab>
+        <Tab value="table" class="ic-sitrep-tabs__tab--desktop">
+          <i class="pi pi-table mr-1.5" aria-hidden="true" />
+          Tabel
+          <span class="ic-sitrep-tabs__badge">{{ filteredIncidents.length }}</span>
+        </Tab>
         <Tab value="timeline">
           <i class="pi pi-history mr-1.5" aria-hidden="true" />
           Tijdlijn
@@ -83,6 +88,9 @@ const mapIncidentCount = computed(() =>
             </p>
             <SitrepMap v-if="mapDrawerOpen" :incidents="incidents" />
           </Drawer>
+        </TabPanel>
+        <TabPanel value="table">
+          <SitrepIncidentTable />
         </TabPanel>
         <TabPanel value="timeline">
           <SitrepTimeline :incidents="filteredIncidents" embedded />
@@ -158,7 +166,8 @@ const mapIncidentCount = computed(() =>
   overscroll-behavior: contain;
 }
 
-.ic-sitrep-tabs :deep(.p-tabpanel:has(.ic-sitrep-split)) {
+.ic-sitrep-tabs :deep(.p-tabpanel:has(.ic-sitrep-split)),
+.ic-sitrep-tabs :deep(.p-tabpanel:has(.ic-sitrep-table)) {
   overflow: hidden;
 }
 
@@ -204,14 +213,59 @@ const mapIncidentCount = computed(() =>
     display: none;
   }
 
+  .ic-sitrep-main-tabs {
+    height: auto;
+    overflow: visible;
+  }
+
+  .ic-sitrep-tabs {
+    height: auto;
+  }
+
+  .ic-sitrep-tabs :deep(.p-tablist) {
+    padding: 0 0.625rem;
+  }
+
+  .ic-sitrep-tabs :deep(.p-tab) {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .ic-sitrep-tabs :deep(.p-tabpanels) {
+    flex: none;
+    overflow: visible;
+  }
+
+  .ic-sitrep-tabs :deep(.p-tabpanel) {
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .ic-sitrep-tabs :deep(.p-tabpanel:has(.ic-sitrep-split)),
+  .ic-sitrep-tabs :deep(.p-tabpanel:has(.ic-sitrep-table)) {
+    overflow: visible;
+    height: auto !important;
+  }
+
+  .ic-sitrep-tabs :deep(.ic-sitrep-tabs__tab--desktop) {
+    display: none;
+  }
+
+  .ic-sitrep-split {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
   .ic-sitrep-map-trigger {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     width: 100%;
     flex-shrink: 0;
     margin: 0;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.75rem;
     border: none;
     border-bottom: 1px solid rgb(135 161 198 / 0.25);
     background:
@@ -236,8 +290,8 @@ const mapIncidentCount = computed(() =>
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 0.625rem;
     background: var(--ic-brand);
     color: #fff;
