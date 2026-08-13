@@ -160,6 +160,29 @@ export function usePinchZoom(options?: {
     return Math.hypot(dx, dy)
   }
 
+  /** Keep the content point under (clientX, clientY) fixed while changing scale. */
+  function zoomAtClientPoint(
+    clientX: number,
+    clientY: number,
+    viewport: HTMLElement,
+    newScale: number,
+  ) {
+    const oldScale = scale.value
+    if (oldScale === newScale) {
+      return
+    }
+
+    const rect = viewport.getBoundingClientRect()
+    const fx = clientX - rect.left
+    const fy = clientY - rect.top
+    const ratio = newScale / oldScale
+
+    translateX.value = fx - rect.width / 2 - (fx - rect.width / 2 - translateX.value) * ratio
+    translateY.value = fy - rect.height / 2 - (fy - rect.height / 2 - translateY.value) * ratio
+    scale.value = newScale
+    clampTranslation()
+  }
+
   function onTouchStart(event: TouchEvent) {
     gestureMoved = false
 
@@ -186,11 +209,18 @@ export function usePinchZoom(options?: {
     if (event.touches.length === 2) {
       event.preventDefault()
       gestureMoved = true
+      const viewport = event.currentTarget as HTMLElement | null
+      if (!viewport) {
+        return
+      }
+
       const distance = getTouchDistance(event.touches)
       const ratio = distance / pinchStartDistance
       const dampedRatio = Math.pow(ratio, pinchExponent)
-      scale.value = clamp(pinchStartScale * dampedRatio, minScale.value, maxScale)
-      clampTranslation()
+      const nextScale = clamp(pinchStartScale * dampedRatio, minScale.value, maxScale)
+      const midX = (event.touches[0]!.clientX + event.touches[1]!.clientX) / 2
+      const midY = (event.touches[0]!.clientY + event.touches[1]!.clientY) / 2
+      zoomAtClientPoint(midX, midY, viewport, nextScale)
       return
     }
 
@@ -217,8 +247,14 @@ export function usePinchZoom(options?: {
 
   function onWheel(event: WheelEvent) {
     event.preventDefault()
+    const viewport = event.currentTarget as HTMLElement | null
+    if (!viewport) {
+      return
+    }
+
     const factor = event.deltaY > 0 ? 1 - wheelStep : 1 + wheelStep
-    scale.value = clamp(scale.value * factor, minScale.value, maxScale)
+    const nextScale = clamp(scale.value * factor, minScale.value, maxScale)
+    zoomAtClientPoint(event.clientX, event.clientY, viewport, nextScale)
     normalizeScale()
   }
 
