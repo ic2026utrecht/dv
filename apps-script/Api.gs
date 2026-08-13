@@ -118,10 +118,13 @@ function createIncidentFromWebApp_(body) {
   var types = readIncidentTypes_(ss);
   var helpOptions = readHelpOptions_(ss);
 
-  var location = locations.filter(function (l) {
-    return l.id === body.locationId;
-  })[0];
-  if (!location) throw new Error('Onbekende locatie');
+  var location = null;
+  if (body.locationId) {
+    location = locations.filter(function (l) {
+      return l.id === body.locationId;
+    })[0];
+    if (!location) throw new Error('Onbekende locatie');
+  }
 
   var incidentType = types.filter(function (t) {
     return t.id === body.incidentTypeId;
@@ -175,21 +178,30 @@ function createIncidentFromWebApp_(body) {
 
 function validateSubmission_(body) {
   var required = [
-    'department', 'locationId', 'sectorRow', 'sectorColumn',
-    'incidentTypeId', 'priority', 'reporter', 'description'
+    'department', 'incidentTypeId', 'priority', 'description'
   ];
   required.forEach(function (key) {
     if (!body[key] && body[key] !== 0) {
       throw new Error('Verplicht veld ontbreekt: ' + key);
     }
   });
-  if ('ABCDEFGHIJKLM'.indexOf(String(body.sectorRow)) === -1) {
-    throw new Error('Ongeldige raster rij');
+
+  var hasLocation = Boolean(body.locationId);
+  var hasSector = Boolean(body.sectorRow) && body.sectorColumn !== undefined && body.sectorColumn !== null && body.sectorColumn !== '';
+  if (!hasLocation && !hasSector) {
+    throw new Error('Locatie of raster sector is verplicht');
   }
-  var col = Number(body.sectorColumn);
-  if (isNaN(col) || col < 1 || col > 22) {
-    throw new Error('Ongeldige raster kolom');
+
+  if (hasSector) {
+    if ('ABCDEFGHIJKLM'.indexOf(String(body.sectorRow)) === -1) {
+      throw new Error('Ongeldige raster rij');
+    }
+    var col = Number(body.sectorColumn);
+    if (isNaN(col) || col < 1 || col > 22) {
+      throw new Error('Ongeldige raster kolom');
+    }
   }
+
   if (body.department === 'EHBO') {
     if (!body.personsInvolved) throw new Error('Aantal betrokkenen verplicht voor EHBO');
     if (body.ambulanceCalled === undefined || body.ambulanceCalled === null) {

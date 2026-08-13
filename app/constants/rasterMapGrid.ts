@@ -88,6 +88,55 @@ export function getSectorMarkerPosition(
   }
 }
 
+/** Bounding box of sector codes as fractions of image width/height. */
+export function getSectorCodesBounds(
+  codes: string[],
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+  bounds = RASTER_MAP_GRID_BOUNDS,
+): { left: number, top: number, right: number, bottom: number } | null {
+  if (!codes.length) {
+    return null
+  }
+
+  const gridWidth = bounds.right - bounds.left
+  const gridHeight = bounds.bottom - bounds.top
+  const cellWidth = gridWidth / columns.length
+  const cellHeight = gridHeight / rows.length
+
+  let minRow = Number.POSITIVE_INFINITY
+  let maxRow = Number.NEGATIVE_INFINITY
+  let minCol = Number.POSITIVE_INFINITY
+  let maxCol = Number.NEGATIVE_INFINITY
+
+  for (const code of codes) {
+    const parsed = code.match(/^([A-M])(\d{1,2})$/i)
+    if (!parsed?.[1] || !parsed[2]) {
+      continue
+    }
+    const rowIndex = rows.indexOf(parsed[1].toUpperCase())
+    const colIndex = columns.indexOf(Number(parsed[2]))
+    if (rowIndex < 0 || colIndex < 0) {
+      continue
+    }
+    minRow = Math.min(minRow, rowIndex)
+    maxRow = Math.max(maxRow, rowIndex)
+    minCol = Math.min(minCol, colIndex)
+    maxCol = Math.max(maxCol, colIndex)
+  }
+
+  if (!Number.isFinite(minRow) || !Number.isFinite(minCol)) {
+    return null
+  }
+
+  return {
+    left: bounds.left + minCol * cellWidth,
+    top: bounds.top + minRow * cellHeight,
+    right: bounds.left + (maxCol + 1) * cellWidth,
+    bottom: bounds.top + (maxRow + 1) * cellHeight,
+  }
+}
+
 /** Map a screen tap to a sector code using the transformed stage element bounds. */
 export function pickSectorAtClientPoint(
   clientX: number,

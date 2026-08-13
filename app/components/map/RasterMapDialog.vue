@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import rasterMap from '~/assets/images/raster-map.png'
-import { buildRasterMapCells, pickSectorAtClientPoint } from '~/constants/rasterMapGrid'
+import { buildRasterMapCells, getSectorCodesBounds, pickSectorAtClientPoint, RASTER_MAP_GRID_BOUNDS } from '~/constants/rasterMapGrid'
 
 const visible = defineModel<boolean>({ default: false })
 
-defineProps<{
+const props = defineProps<{
   selectedSector?: string | null
+  /** null/undefined = all sectors allowed; string[] = only these codes */
+  allowedSectors?: string[] | null
 }>()
 
 const emit = defineEmits<{
@@ -13,6 +15,17 @@ const emit = defineEmits<{
 }>()
 
 const cells = buildRasterMapCells()
+const allowedSet = computed(() => {
+  if (!props.allowedSectors) {
+    return null
+  }
+  return new Set(props.allowedSectors.map(code => code.toUpperCase()))
+})
+
+function isAllowed(code: string): boolean {
+  return !allowedSet.value || allowedSet.value.has(code.toUpperCase())
+}
+
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
@@ -22,6 +35,7 @@ const pinchZoom = usePinchZoom({ maxScale: 8 })
 const {
   transformStyle,
   reset,
+  focusOnRegion,
   onTouchStart,
   onTouchMove,
   onTouchEnd,
@@ -31,14 +45,68 @@ const {
   onPointerUp,
 } = pinchZoom
 
-useSitrepMapFit(viewportRef, imageRef, pinchZoom)
+const { updateMapFit, resetMapView } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
+
+function focusAllowedRegion() {
+  if (!props.allowedSectors?.length) {
+    resetMapView()
+    return
+  }
+
+  const region = getSectorCodesBounds(props.allowedSectors)
+  if (!region) {
+    resetMapView()
+    return
+  }
+
+  // Only zoom when the area is meaningfully smaller than the full grid.
+  const fullArea = (RASTER_MAP_GRID_BOUNDS.right - RASTER_MAP_GRID_BOUNDS.left)
+    * (RASTER_MAP_GRID_BOUNDS.bottom - RASTER_MAP_GRID_BOUNDS.top)
+  const regionArea = (region.right - region.left) * (region.bottom - region.top)
+  if (regionArea / fullArea > 0.85) {
+    resetMapView()
+    return
+  }
+
+  focusOnRegion(region)
+}
+
+async function applyInitialView() {
+  await nextTick()
+
+  const img = imageRef.value
+  if (img && !img.complete) {
+    await new Promise<void>((resolve) => {
+      img.addEventListener('load', () => resolve(), { once: true })
+    })
+  }
+
+  updateMapFit()
+  // Wait for layout after dialog open + image fit.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      focusAllowedRegion()
+    })
+  })
+}
 
 watch(visible, (open) => {
   if (!open) {
     reset()
     pendingSector.value = null
+    return
   }
+  applyInitialView()
 })
+
+watch(
+  () => props.allowedSectors,
+  () => {
+    if (visible.value) {
+      focusAllowedRegion()
+    }
+  },
+)
 
 watch(viewportRef, (el, _prev, onCleanup) => {
   if (!el) {
@@ -55,6 +123,9 @@ function close() {
 }
 
 function onCellTap(code: string) {
+  if (!isAllowed(code)) {
+    return
+  }
   pendingSector.value = code
 }
 
@@ -123,10 +194,12 @@ function handlePointerUp(event: PointerEvent) {
 
     <div class="ic-raster-dialog__toolbar">
       <p class="ic-raster-dialog__title">
-        Rasterkaart · A–M × 1–22
+        Rasterkaart · {{ allowedSet ? 'locatiegebied' : 'A–M × 1–22' }}
       </p>
       <p class="ic-raster-dialog__hint">
-        Scroll/knijp om te zoomen · sleep om te verschuiven · tik om te markeren
+        {{ allowedSet
+          ? 'Ingezoomd op toegestane sectoren · tik om te markeren'
+          : 'Scroll/knijp om te zoomen · sleep om te verschuiven · tik om te markeren' }}
       </p>
     </div>
 
@@ -159,6 +232,7 @@ function handlePointerUp(event: PointerEvent) {
             :class="{
               'ic-raster-cell--selected': selectedSector === cell.code && pendingSector !== cell.code,
               'ic-raster-cell--pending': pendingSector === cell.code,
+              'ic-raster-cell--disabled': allowedSet && !isAllowed(cell.code),
             }"
             :style="cell.style"
           />
@@ -317,6 +391,12 @@ function handlePointerUp(event: PointerEvent) {
   box-shadow:
     inset 0 0 0 2px rgb(230 151 50 / 0.75),
     0 0 0 2px rgb(230 151 50 / 0.35);
+}
+
+.ic-raster-cell--disabled {
+  background: rgb(0 0 0 / 0.28);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .ic-raster-dialog__confirm {

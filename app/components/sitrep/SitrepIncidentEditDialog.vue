@@ -2,10 +2,11 @@
 import type { Incident, IncidentUpdate } from '~/types/models'
 import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
 import {
-  buildSectorOptions,
+  expandLocationSectors,
   filterIncidentTypes,
   locationOptions,
   parseSectorCode,
+  sectorOptionsForLocation,
   toSelectOptions,
 } from '~/utils/incidentOptions'
 import {
@@ -138,11 +139,37 @@ const locationSelectOptions = computed(() =>
   locationOptions(config.value?.locations ?? []),
 )
 
-const sectorSelectOptions = computed(() =>
-  buildSectorOptions(
+const selectedLocation = computed(() =>
+  (config.value?.locations ?? []).find(l => l.id === form.locationId),
+)
+
+const allowedSectors = computed(() =>
+  expandLocationSectors(
+    selectedLocation.value,
     config.value?.raster.rows,
     config.value?.raster.columns,
   ),
+)
+
+const sectorSelectOptions = computed(() =>
+  sectorOptionsForLocation(
+    selectedLocation.value,
+    config.value?.raster.rows,
+    config.value?.raster.columns,
+  ),
+)
+
+watch(
+  () => form.locationId,
+  (locationId, previous) => {
+    if (!previous || locationId === previous || !form.sectorCode) {
+      return
+    }
+    const allowed = allowedSectors.value
+    if (allowed && !allowed.includes(form.sectorCode.toUpperCase())) {
+      form.sectorCode = ''
+    }
+  },
 )
 
 const incidentTypeOptions = computed(() =>

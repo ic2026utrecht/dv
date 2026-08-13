@@ -22,7 +22,7 @@ import type {
 } from '~/types/models'
 import { PERSONS_COUNT_OPTIONS } from '~/constants/incident'
 import { INCIDENT_CONFIG_API_VERSION } from '~/utils/incidentConfigCache'
-import { RASTER_COLUMNS, RASTER_ROWS } from '~/utils/incidentOptions'
+import { parseSectorRangesJson, RASTER_COLUMNS, RASTER_ROWS } from '~/utils/incidentOptions'
 
 export function assertSupabaseConfig(url: string, anonKey: string): void {
   if (!url || !anonKey || anonKey.includes('YOUR_')) {
@@ -228,21 +228,30 @@ function appendEhboDescription(description: string, personsInvolved?: number): s
 
 function validateSubmission(body: IncidentSubmission): void {
   const required: (keyof IncidentSubmission)[] = [
-    'department', 'locationId', 'sectorRow', 'sectorColumn',
-    'incidentTypeId', 'priority', 'description',
+    'department', 'incidentTypeId', 'priority', 'description',
   ]
   for (const key of required) {
     if (body[key] === undefined || body[key] === null || body[key] === '') {
       throw new Error(`Verplicht veld ontbreekt: ${key}`)
     }
   }
-  if (!RASTER_ROWS.includes(body.sectorRow)) {
-    throw new Error('Ongeldige raster rij')
+
+  const hasLocation = Boolean(body.locationId?.trim())
+  const hasSector = Boolean(body.sectorRow?.trim()) && body.sectorColumn != null
+  if (!hasLocation && !hasSector) {
+    throw new Error('Locatie of raster sector is verplicht')
   }
-  const col = Number(body.sectorColumn)
-  if (Number.isNaN(col) || col < 1 || col > 22) {
-    throw new Error('Ongeldige raster kolom')
+
+  if (hasSector) {
+    if (!RASTER_ROWS.includes(body.sectorRow!)) {
+      throw new Error('Ongeldige raster rij')
+    }
+    const col = Number(body.sectorColumn)
+    if (Number.isNaN(col) || col < 1 || col > 22) {
+      throw new Error('Ongeldige raster kolom')
+    }
   }
+
   if (body.department === 'EHBO') {
     if (!body.personsInvolved) throw new Error('Aantal betrokkenen verplicht voor EHBO')
     if (body.ambulanceCalled === undefined || body.ambulanceCalled === null) {
@@ -267,6 +276,7 @@ export async function fetchSupabaseConfig(client: SupabaseClient): Promise<Confi
     name: row.name,
     zone: row.zone ?? '',
     active: row.active !== false,
+    sectorRanges: parseSectorRangesJson(row.sector_ranges),
   }))
 
   const incidentTypes: IncidentType[] = (typesRes.data ?? []).map(row => ({
@@ -337,7 +347,7 @@ export async function postSupabaseIncident(
 
   const { data, error } = await client.rpc('submit_public_incident', {
     p_department: payload.department,
-    p_location_id: payload.locationId,
+    p_location_id: payload.locationId?.trim() || null,
     p_sector_row: payload.sectorRow ?? '',
     p_sector_column: payload.sectorColumn ?? null,
     p_incident_type_id: payload.incidentTypeId,

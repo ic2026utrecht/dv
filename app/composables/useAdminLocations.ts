@@ -1,4 +1,5 @@
-import type { Location } from '~/types/models'
+import type { Location, SectorRange } from '~/types/models'
+import { normalizeSectorRanges, parseSectorRangesJson } from '~/utils/incidentOptions'
 
 export const LOCATION_ZONES = [
   { value: 'hal', label: 'Hal' },
@@ -14,12 +15,14 @@ function mapLocationRow(row: {
   name: string
   zone: string | null
   active: boolean | null
+  sector_ranges?: unknown
 }): Location {
   return {
     id: row.id,
     name: row.name,
     zone: row.zone ?? '',
     active: row.active !== false,
+    sectorRanges: parseSectorRangesJson(row.sector_ranges),
   }
 }
 
@@ -63,11 +66,14 @@ export function useAdminLocations() {
     name: string
     zone: string
     active?: boolean
+    sectorRanges?: SectorRange[]
   }): Promise<Location> {
     const trimmedName = payload.name.trim()
     if (!trimmedName) {
       throw new Error('Naam is verplicht')
     }
+
+    const sectorRanges = normalizeSectorRanges(payload.sectorRanges ?? [])
 
     const existing = await listLocations()
     const existingIds = new Set(existing.map(location => location.id))
@@ -80,6 +86,7 @@ export function useAdminLocations() {
         name: trimmedName,
         zone: payload.zone,
         active: payload.active !== false,
+        sector_ranges: sectorRanges,
       })
       .select('*')
       .single()
@@ -93,19 +100,26 @@ export function useAdminLocations() {
     name: string
     zone: string
     active: boolean
+    sectorRanges?: SectorRange[]
   }): Promise<Location> {
     const trimmedName = payload.name.trim()
     if (!trimmedName) {
       throw new Error('Naam is verplicht')
     }
 
+    const updatePayload: Record<string, unknown> = {
+      name: trimmedName,
+      zone: payload.zone,
+      active: payload.active,
+    }
+
+    if (payload.sectorRanges !== undefined) {
+      updatePayload.sector_ranges = normalizeSectorRanges(payload.sectorRanges)
+    }
+
     const { data, error } = await supabase
       .from('locations')
-      .update({
-        name: trimmedName,
-        zone: payload.zone,
-        active: payload.active,
-      })
+      .update(updatePayload)
       .eq('id', payload.id)
       .select('*')
       .single()

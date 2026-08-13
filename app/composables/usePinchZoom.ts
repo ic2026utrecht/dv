@@ -91,6 +91,36 @@ export function usePinchZoom(options?: {
     resetToFit(minScale.value)
   }
 
+  /** Zoom/pan so a region (fractions of content 0–1) fills the viewport. */
+  function focusOnRegion(
+    region: { left: number, top: number, right: number, bottom: number },
+    padding = 0.14,
+  ) {
+    const bounds = getClampBounds?.()
+    if (!bounds) {
+      return
+    }
+
+    const { viewportW, viewportH, contentW, contentH } = bounds
+    const regionW = Math.max((region.right - region.left) * contentW, 1)
+    const regionH = Math.max((region.bottom - region.top) * contentH, 1)
+    const pad = clamp(1 - padding, 0.4, 1)
+
+    const nextScale = clamp(
+      Math.min(viewportW / regionW, viewportH / regionH) * pad,
+      minScale.value,
+      maxScale,
+    )
+
+    const cx = (region.left + region.right) / 2
+    const cy = (region.top + region.bottom) / 2
+
+    scale.value = nextScale
+    translateX.value = -(cx - 0.5) * contentW * nextScale
+    translateY.value = -(cy - 0.5) * contentH * nextScale
+    clampTranslation()
+  }
+
   function normalizeScale() {
     scale.value = clamp(scale.value, minScale.value, maxScale)
     if (scale.value <= minScale.value) {
@@ -254,6 +284,7 @@ export function usePinchZoom(options?: {
     setMinScale,
     setClampBounds,
     clampTranslation,
+    focusOnRegion,
     onTouchStart,
     onTouchMove,
     onTouchEnd,

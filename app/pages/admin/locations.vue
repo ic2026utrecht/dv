@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { Location } from '~/types/models'
+import type { Location, SectorRange } from '~/types/models'
 import { LOCATION_ZONES, useAdminLocations } from '~/composables/useAdminLocations'
+import { expandLocationSectors } from '~/utils/incidentOptions'
 
 useHead({ title: 'Locaties — Admin — IC2026 DV' })
 
@@ -15,6 +16,7 @@ const error = ref<string | null>(null)
 const name = ref('')
 const zone = ref('hal')
 const active = ref(true)
+const addRanges = ref<SectorRange[]>([])
 const adding = ref(false)
 const addError = ref<string | null>(null)
 
@@ -23,6 +25,7 @@ const editRow = ref<Location | null>(null)
 const editName = ref('')
 const editZone = ref('hal')
 const editActive = ref(true)
+const editRanges = ref<SectorRange[]>([])
 const savingEdit = ref(false)
 const editError = ref<string | null>(null)
 
@@ -31,6 +34,47 @@ const zoneOptions = LOCATION_ZONES.map(z => ({ value: z.value, label: z.label })
 function zoneLabel(value: string): string {
   return LOCATION_ZONES.find(z => z.value === value)?.label ?? value
 }
+
+function emptyRange(): SectorRange {
+  return { from: '', to: '' }
+}
+
+function cloneRanges(ranges: SectorRange[] | undefined): SectorRange[] {
+  return (ranges ?? []).map(r => ({ from: r.from, to: r.to }))
+}
+
+function sectorSummary(location: Location): string {
+  const ranges = location.sectorRanges ?? []
+  if (!ranges.length) {
+    return 'Alle sectoren'
+  }
+  const expanded = expandLocationSectors(location)
+  const count = expanded?.length ?? 0
+  if (ranges.length === 1) {
+    return `${ranges[0]!.from}–${ranges[0]!.to} · ${count} sectoren`
+  }
+  return `${ranges.length} bereiken · ${count} sectoren`
+}
+
+function rangePreview(ranges: SectorRange[]): string {
+  const expanded = expandLocationSectors({
+    id: '',
+    name: '',
+    zone: '',
+    active: true,
+    sectorRanges: ranges.filter(r => r.from.trim() && r.to.trim()),
+  })
+  if (!ranges.some(r => r.from.trim() || r.to.trim())) {
+    return 'Geen bereiken → alle sectoren zichtbaar'
+  }
+  if (!expanded?.length) {
+    return 'Ongeldige of onvolledige bereiken'
+  }
+  return `${expanded.length} sectoren in selectie`
+}
+
+const addRangePreview = computed(() => rangePreview(addRanges.value))
+const editRangePreview = computed(() => rangePreview(editRanges.value))
 
 async function refreshIncidentConfig() {
   await fetchConfig(true).catch(() => {})
@@ -63,10 +107,12 @@ async function onAdd() {
       name: name.value,
       zone: zone.value,
       active: active.value,
+      sectorRanges: addRanges.value,
     })
     name.value = ''
     zone.value = 'hal'
     active.value = true
+    addRanges.value = []
     await load()
     await refreshIncidentConfig()
   }
@@ -83,6 +129,7 @@ function openEdit(row: Location) {
   editName.value = row.name
   editZone.value = row.zone || 'hal'
   editActive.value = row.active
+  editRanges.value = cloneRanges(row.sectorRanges)
   editError.value = null
   editVisible.value = true
 }
@@ -97,6 +144,7 @@ async function saveEdit() {
       name: editName.value,
       zone: editZone.value,
       active: editActive.value,
+      sectorRanges: editRanges.value,
     })
     editVisible.value = false
     await load()
@@ -118,6 +166,7 @@ async function toggleActive(row: Location) {
       name: row.name,
       zone: row.zone,
       active: !row.active,
+      sectorRanges: row.sectorRanges ?? [],
     })
     await load()
     await refreshIncidentConfig()
@@ -176,6 +225,61 @@ async function toggleActive(row: Location) {
             </label>
           </div>
         </div>
+
+        <div class="sm:col-span-2 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <label class="ic-label mb-0">Sectorbereiken</label>
+            <Button
+              type="button"
+              label="Bereik toevoegen"
+              icon="pi pi-plus"
+              size="small"
+              severity="secondary"
+              outlined
+              @click="addRanges.push(emptyRange())"
+            />
+          </div>
+          <p class="text-xs text-slate-500">
+            Hoeken van een rechthoek op het raster, bijv. A1 tot C8 (= 24 sectoren). Leeg = alle sectoren.
+          </p>
+          <div
+            v-for="(range, index) in addRanges"
+            :key="`add-range-${index}`"
+            class="flex flex-wrap items-end gap-2"
+          >
+            <div class="min-w-[5.5rem] flex-1">
+              <label class="ic-label" :for="`add-from-${index}`">Van</label>
+              <InputText
+                :id="`add-from-${index}`"
+                v-model="range.from"
+                class="ic-field"
+                placeholder="A1"
+              />
+            </div>
+            <div class="min-w-[5.5rem] flex-1">
+              <label class="ic-label" :for="`add-to-${index}`">Tot</label>
+              <InputText
+                :id="`add-to-${index}`"
+                v-model="range.to"
+                class="ic-field"
+                placeholder="C8"
+              />
+            </div>
+            <Button
+              type="button"
+              icon="pi pi-trash"
+              severity="danger"
+              text
+              rounded
+              aria-label="Bereik verwijderen"
+              @click="addRanges.splice(index, 1)"
+            />
+          </div>
+          <p class="text-sm font-medium text-slate-600">
+            {{ addRangePreview }}
+          </p>
+        </div>
+
         <Message
           v-if="addError"
           class="sm:col-span-2"
@@ -238,6 +342,9 @@ async function toggleActive(row: Location) {
             </p>
             <p class="text-sm text-slate-600">
               {{ zoneLabel(row.zone) }}
+            </p>
+            <p class="text-sm text-slate-600">
+              {{ sectorSummary(row) }}
             </p>
             <p class="text-xs text-slate-500">
               {{ row.id }}
@@ -309,6 +416,61 @@ async function toggleActive(row: Location) {
           Actief (zichtbaar in formulieren)
         </label>
       </div>
+
+      <div class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <label class="ic-label mb-0">Sectorbereiken</label>
+          <Button
+            type="button"
+            label="Bereik toevoegen"
+            icon="pi pi-plus"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="editRanges.push(emptyRange())"
+          />
+        </div>
+        <p class="text-xs text-slate-500">
+          Hoeken van een rechthoek, bijv. A1 tot C8. Leeg = alle sectoren.
+        </p>
+        <div
+          v-for="(range, index) in editRanges"
+          :key="`edit-range-${index}`"
+          class="flex flex-wrap items-end gap-2"
+        >
+          <div class="min-w-[5.5rem] flex-1">
+            <label class="ic-label" :for="`edit-from-${index}`">Van</label>
+            <InputText
+              :id="`edit-from-${index}`"
+              v-model="range.from"
+              class="ic-field"
+              placeholder="A1"
+            />
+          </div>
+          <div class="min-w-[5.5rem] flex-1">
+            <label class="ic-label" :for="`edit-to-${index}`">Tot</label>
+            <InputText
+              :id="`edit-to-${index}`"
+              v-model="range.to"
+              class="ic-field"
+              placeholder="C8"
+            />
+          </div>
+          <Button
+            type="button"
+            icon="pi pi-trash"
+            severity="danger"
+            text
+            rounded
+            aria-label="Bereik verwijderen"
+            @click="editRanges.splice(index, 1)"
+          />
+        </div>
+        <p class="text-sm font-medium text-slate-600">
+          {{ editRangePreview }}
+        </p>
+      </div>
+
       <Message
         v-if="editError"
         severity="error"

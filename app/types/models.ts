@@ -7,11 +7,18 @@ export interface SelectOption {
   label: string
 }
 
+export interface SectorRange {
+  from: string
+  to: string
+}
+
 export interface Location {
   id: string
   name: string
   zone: string
   active: boolean
+  /** Rectangular raster ranges; empty = unrestricted (full A–M × 1–22). */
+  sectorRanges?: SectorRange[]
 }
 
 export interface IncidentType {
@@ -96,9 +103,9 @@ export interface IncidentConfig {
 
 export interface IncidentSubmission {
   department: Department
-  locationId: string
-  sectorRow: string
-  sectorColumn: number
+  locationId?: string
+  sectorRow?: string
+  sectorColumn?: number | null
   incidentTypeId: string
   priority: Priority
   helpOptionIds: string[]

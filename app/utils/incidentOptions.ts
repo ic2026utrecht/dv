@@ -1,4 +1,4 @@
-import type { Department, IncidentType, Location, SelectOption } from '~/types/models'
+import type { Department, IncidentType, Location, SectorRange, SelectOption } from '~/types/models'
 
 export const RASTER_ROWS = 'ABCDEFGHIJKLM'.split('')
 export const RASTER_COLUMNS = Array.from({ length: 22 }, (_, i) => i + 1)
@@ -57,6 +57,141 @@ export function parseSectorCode(
     column,
     code: formatSector(row, column),
   }
+}
+
+/** Expand one rectangle; corners may be given in any order. */
+export function expandSectorRange(
+  from: string,
+  to: string,
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+): string[] {
+  const a = parseSectorCode(from, rows, columns)
+  const b = parseSectorCode(to, rows, columns)
+  if (!a || !b) {
+    return []
+  }
+
+  const rowA = rows.indexOf(a.row)
+  const rowB = rows.indexOf(b.row)
+  const colA = columns.indexOf(a.column)
+  const colB = columns.indexOf(b.column)
+  if (rowA < 0 || rowB < 0 || colA < 0 || colB < 0) {
+    return []
+  }
+
+  const rowStart = Math.min(rowA, rowB)
+  const rowEnd = Math.max(rowA, rowB)
+  const colStart = Math.min(colA, colB)
+  const colEnd = Math.max(colA, colB)
+
+  const codes: string[] = []
+  for (let r = rowStart; r <= rowEnd; r++) {
+    for (let c = colStart; c <= colEnd; c++) {
+      codes.push(formatSector(rows[r]!, columns[c]!))
+    }
+  }
+  return codes
+}
+
+function sortSectorCodes(
+  codes: string[],
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+): string[] {
+  return [...codes].sort((left, right) => {
+    const a = parseSectorCode(left, rows, columns)
+    const b = parseSectorCode(right, rows, columns)
+    if (!a || !b) {
+      return left.localeCompare(right)
+    }
+    const rowDiff = rows.indexOf(a.row) - rows.indexOf(b.row)
+    if (rowDiff !== 0) {
+      return rowDiff
+    }
+    return columns.indexOf(a.column) - columns.indexOf(b.column)
+  })
+}
+
+/**
+ * Union of all ranges on a location.
+ * Returns null when unrestricted (empty/missing ranges).
+ */
+export function expandLocationSectors(
+  location: Location | undefined,
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+): string[] | null {
+  const ranges = location?.sectorRanges ?? []
+  if (!ranges.length) {
+    return null
+  }
+
+  const set = new Set<string>()
+  for (const range of ranges) {
+    for (const code of expandSectorRange(range.from, range.to, rows, columns)) {
+      set.add(code)
+    }
+  }
+
+  if (!set.size) {
+    return null
+  }
+
+  return sortSectorCodes([...set], rows, columns)
+}
+
+/** Dropdown options for a location (expanded + sorted). Empty ranges → full grid. */
+export function sectorOptionsForLocation(
+  location: Location | undefined,
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+): SelectOption[] {
+  const allowed = expandLocationSectors(location, rows, columns)
+  if (!allowed) {
+    return buildSectorOptions(rows, columns)
+  }
+  return allowed.map(code => ({ value: code, label: code }))
+}
+
+/** Normalize and validate sector ranges for persistence; throws on invalid corners. */
+export function normalizeSectorRanges(ranges: SectorRange[]): SectorRange[] {
+  const normalized: SectorRange[] = []
+
+  for (const range of ranges) {
+    const from = String(range.from ?? '').trim().toUpperCase()
+    const to = String(range.to ?? '').trim().toUpperCase()
+    if (!from && !to) {
+      continue
+    }
+    if (!parseSectorCode(from) || !parseSectorCode(to)) {
+      throw new Error(`Ongeldig sectorbereik: ${from || '?'}–${to || '?'}`)
+    }
+    normalized.push({ from, to })
+  }
+
+  return normalized
+}
+
+export function parseSectorRangesJson(value: unknown): SectorRange[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const ranges: SectorRange[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object') {
+      continue
+    }
+    const row = item as Record<string, unknown>
+    const from = typeof row.from === 'string' ? row.from.trim().toUpperCase() : ''
+    const to = typeof row.to === 'string' ? row.to.trim().toUpperCase() : ''
+    if (!from || !to) {
+      continue
+    }
+    ranges.push({ from, to })
+  }
+  return ranges
 }
 
 export function filterIncidentTypes(

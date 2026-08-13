@@ -54,8 +54,21 @@ const locationSelectOptions = computed(() =>
   locationOptions(config.value?.locations ?? []),
 )
 
+const selectedLocation = computed(() =>
+  (config.value?.locations ?? []).find(l => l.id === locationId.value),
+)
+
+const allowedSectors = computed(() =>
+  expandLocationSectors(
+    selectedLocation.value,
+    config.value?.raster.rows ?? RASTER_ROWS,
+    config.value?.raster.columns ?? RASTER_COLUMNS,
+  ),
+)
+
 const sectorSelectOptions = computed(() =>
-  buildSectorOptions(
+  sectorOptionsForLocation(
+    selectedLocation.value,
     config.value?.raster.rows ?? RASTER_ROWS,
     config.value?.raster.columns ?? RASTER_COLUMNS,
   ),
@@ -86,7 +99,7 @@ const progressStep = computed(() => {
   if (props.showDepartmentSelection && !department.value) {
     return 1
   }
-  if (!locationId.value || !parsedSector.value || !priority.value) {
+  if ((!locationId.value && !parsedSector.value) || !priority.value) {
     return props.showDepartmentSelection ? 2 : 1
   }
   if (!incidentTypeId.value) {
@@ -105,11 +118,22 @@ watch(department, () => {
   ambulanceCalled.value = null
 })
 
+watch(locationId, () => {
+  if (!sectorCode.value) {
+    return
+  }
+  const allowed = allowedSectors.value
+  if (allowed && !allowed.includes(sectorCode.value.toUpperCase())) {
+    sectorCode.value = null
+  }
+})
+
+const hasPlace = computed(() => Boolean(locationId.value || parsedSector.value))
+
 const canSubmit = computed(() =>
   Boolean(
     department.value
-    && locationId.value
-    && parsedSector.value
+    && hasPlace.value
     && incidentTypeId.value
     && priority.value
     && description.value.trim()
@@ -119,8 +143,7 @@ const canSubmit = computed(() =>
 
 type RequiredFieldKey =
   | 'department'
-  | 'location'
-  | 'sector'
+  | 'place'
   | 'priority'
   | 'incidentType'
   | 'description'
@@ -129,8 +152,7 @@ type RequiredFieldKey =
 
 const requiredFieldLabels: Record<RequiredFieldKey, string> = {
   department: 'Afdeling',
-  location: 'Locatie',
-  sector: 'Raster sector',
+  place: 'Locatie of raster sector',
   priority: 'Prioriteit',
   incidentType: 'Soort incident',
   description: 'Korte omschrijving',
@@ -140,8 +162,7 @@ const requiredFieldLabels: Record<RequiredFieldKey, string> = {
 
 const fieldInvalid = computed(() => ({
   department: props.showDepartmentSelection && !department.value,
-  location: !locationId.value,
-  sector: !parsedSector.value,
+  place: !hasPlace.value,
   priority: !priority.value,
   incidentType: Boolean(department.value) && !incidentTypeId.value,
   description: !description.value.trim(),
@@ -151,8 +172,7 @@ const fieldInvalid = computed(() => ({
 
 const emptyFieldInvalid = (): Record<RequiredFieldKey, boolean> => ({
   department: false,
-  location: false,
-  sector: false,
+  place: false,
   priority: false,
   incidentType: false,
   description: false,
@@ -173,7 +193,7 @@ const missingFields = computed(() =>
 async function onSubmit() {
   submitAttempted.value = true
 
-  if (!canSubmit.value || !department.value || !locationId.value || !parsedSector.value
+  if (!canSubmit.value || !department.value || !hasPlace.value
     || !incidentTypeId.value || !priority.value) {
     return
   }
@@ -184,9 +204,9 @@ async function onSubmit() {
   try {
     const result = await submitIncident({
       department: department.value,
-      locationId: locationId.value,
-      sectorRow: parsedSector.value.row,
-      sectorColumn: parsedSector.value.column,
+      locationId: locationId.value || undefined,
+      sectorRow: parsedSector.value?.row,
+      sectorColumn: parsedSector.value?.column ?? null,
       incidentTypeId: incidentTypeId.value,
       priority: priority.value,
       helpOptionIds: helpOptionIds.value,
@@ -272,9 +292,8 @@ async function onSubmit() {
             <IcFormField
               label="Locatie"
               html-for="location"
-              required
-              hint="Kies de dichtstbijzijnde hal, entree of zone"
-              :invalid="showFieldInvalid.location"
+              hint="Kies de dichtstbijzijnde hal, entree of zone (of vul een sector in)"
+              :invalid="showFieldInvalid.place"
             >
               <Select
                 id="location"
@@ -284,6 +303,7 @@ async function onSubmit() {
                 option-value="value"
                 placeholder="Selecteer locatie…"
                 filter
+                auto-filter-focus
                 fluid
               />
             </IcFormField>
@@ -291,9 +311,8 @@ async function onSubmit() {
             <IcFormField
               label="Raster sector"
               html-for="sector"
-              required
-              hint="Bijv. A1 of E7 — rij A t/m M, kolom 1 t/m 22"
-              :invalid="showFieldInvalid.sector"
+              hint="Bijv. A1 of E7 — rij A t/m M, kolom 1 t/m 22 (of kies een locatie)"
+              :invalid="showFieldInvalid.place"
             >
               <Select
                 id="sector"
@@ -303,7 +322,7 @@ async function onSubmit() {
                 option-value="value"
                 placeholder="Bijv. A1"
                 filter
-                editable
+                auto-filter-focus
                 filter-placeholder="Zoek sector…"
                 fluid
               />
@@ -321,6 +340,7 @@ async function onSubmit() {
             <RasterMapDialog
               v-model="rasterMapOpen"
               :selected-sector="sectorCode"
+              :allowed-sectors="allowedSectors"
               @select="sectorCode = $event"
             />
 
