@@ -108,12 +108,7 @@ function formatTime(timestamp: string): string {
   <section class="ic-sitrep-map ic-sitrep-map--panel">
     <header class="ic-sitrep-map__header">
       <div class="ic-sitrep-map__header-main">
-        <h2 class="ic-sitrep-map__title">
-          Kaartoverzicht
-        </h2>
-        <p class="ic-sitrep-map__hint">
-          Scroll/knijp om te zoomen · sleep om te verschuiven
-        </p>
+
       </div>
       <div class="ic-sitrep-map__header-actions">
         <button

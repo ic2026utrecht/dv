@@ -101,6 +101,21 @@ export function usePinchZoom(options?: {
     clampTranslation()
   }
 
+  function canPan() {
+    if (scale.value > minScale.value) {
+      return true
+    }
+
+    const bounds = getClampBounds?.()
+    if (!bounds) {
+      return true
+    }
+
+    const scaledW = bounds.contentW * scale.value
+    const scaledH = bounds.contentH * scale.value
+    return scaledW > bounds.viewportW + 0.5 || scaledH > bounds.viewportH + 0.5
+  }
+
   function markMoved(clientX: number, clientY: number) {
     const dx = clientX - panStartX
     const dy = clientY - panStartY
@@ -129,7 +144,7 @@ export function usePinchZoom(options?: {
       panStartX = event.touches[0]!.clientX
       panStartY = event.touches[0]!.clientY
 
-      if (scale.value > minScale.value) {
+      if (canPan()) {
         isPanning = true
         panOriginX = translateX.value
         panOriginY = translateY.value
@@ -187,7 +202,7 @@ export function usePinchZoom(options?: {
     panStartY = event.clientY
     activePointerId = event.pointerId
 
-    if (scale.value > minScale.value) {
+    if (canPan()) {
       isPanning = true
       panOriginX = translateX.value
       panOriginY = translateY.value

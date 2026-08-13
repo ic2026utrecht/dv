@@ -13,9 +13,12 @@ const emit = defineEmits<{
 }>()
 
 const cells = buildRasterMapCells()
+const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
+const imageRef = ref<HTMLImageElement | null>(null)
 const pendingSector = ref<string | null>(null)
 
+const pinchZoom = usePinchZoom({ maxScale: 8 })
 const {
   transformStyle,
   reset,
@@ -26,7 +29,9 @@ const {
   onPointerDown,
   onPointerMove,
   onPointerUp,
-} = usePinchZoom({ maxScale: 8 })
+} = pinchZoom
+
+useSitrepMapFit(viewportRef, imageRef, pinchZoom)
 
 watch(visible, (open) => {
   if (!open) {
@@ -34,6 +39,16 @@ watch(visible, (open) => {
     pendingSector.value = null
   }
 })
+
+watch(viewportRef, (el, _prev, onCleanup) => {
+  if (!el) {
+    return
+  }
+
+  // Vue @wheel is not reliably non-passive inside a modal with overflow:hidden.
+  el.addEventListener('wheel', onWheel, { passive: false })
+  onCleanup(() => el.removeEventListener('wheel', onWheel))
+}, { flush: 'post' })
 
 function close() {
   visible.value = false
@@ -111,17 +126,17 @@ function handlePointerUp(event: PointerEvent) {
         Rasterkaart · A–M × 1–22
       </p>
       <p class="ic-raster-dialog__hint">
-        Tik op een vak om te markeren · bevestig je keuze hieronder
+        Scroll/knijp om te zoomen · sleep om te verschuiven · tik om te markeren
       </p>
     </div>
 
     <div
+      ref="viewportRef"
       class="ic-raster-dialog__viewport"
       @touchstart.passive="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="handleTouchEnd"
       @touchcancel="handleTouchEnd"
-      @wheel="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="handlePointerUp"
@@ -129,6 +144,7 @@ function handlePointerUp(event: PointerEvent) {
     >
       <div ref="stageRef" class="ic-raster-dialog__stage" :style="transformStyle">
         <img
+          ref="imageRef"
           :src="rasterMap"
           alt=""
           class="ic-raster-dialog__image"
@@ -186,6 +202,8 @@ function handlePointerUp(event: PointerEvent) {
   border-radius: 0 !important;
   border: none !important;
   box-shadow: none !important;
+  /* PrimeVue sets transform: scale(1), which steals desktop pinch/wheel from the map. */
+  transform: none !important;
 }
 
 .ic-raster-dialog .p-dialog-content {
@@ -246,10 +264,11 @@ function handlePointerUp(event: PointerEvent) {
   min-height: 0;
   overflow: hidden;
   touch-action: none;
+  overscroll-behavior: none;
   cursor: grab;
   user-select: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
 }
 
@@ -260,6 +279,7 @@ function handlePointerUp(event: PointerEvent) {
 .ic-raster-dialog__stage {
   position: relative;
   width: 100%;
+  flex-shrink: 0;
   transform-origin: center center;
   will-change: transform;
 }

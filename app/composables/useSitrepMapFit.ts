@@ -55,26 +55,30 @@ export function useSitrepMapFit(
     pinchZoom.resetToFit(fitScale.value)
   }
 
-  onMounted(() => {
-    const img = imageRef.value
-    img?.addEventListener('load', updateMapFit)
+  watch(
+    [viewportRef, imageRef],
+    ([viewport, img], _prev, onCleanup) => {
+      if (!viewport || !img) {
+        return
+      }
 
-    const observer = viewportRef.value
-      ? new ResizeObserver(() => updateMapFit())
-      : null
-    if (viewportRef.value && observer) {
-      observer.observe(viewportRef.value)
-    }
+      const onLoad = () => updateMapFit()
+      img.addEventListener('load', onLoad)
 
-    if (img?.complete) {
-      updateMapFit()
-    }
+      const observer = new ResizeObserver(() => updateMapFit())
+      observer.observe(viewport)
 
-    onUnmounted(() => {
-      img?.removeEventListener('load', updateMapFit)
-      observer?.disconnect()
-    })
-  })
+      if (img.complete) {
+        updateMapFit()
+      }
+
+      onCleanup(() => {
+        img.removeEventListener('load', onLoad)
+        observer.disconnect()
+      })
+    },
+    { flush: 'post' },
+  )
 
   return {
     fitScale,

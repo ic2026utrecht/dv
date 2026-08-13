@@ -83,9 +83,7 @@ const mapIncidentCount = computed(() =>
             :block-scroll="true"
             :dismissable-mask="true"
           >
-            <p class="ic-sitrep-map-drawer__hint">
-              Knijp om te zoomen · sleep om te verschuiven
-            </p>
+    
             <SitrepMap v-if="mapDrawerOpen" :incidents="incidents" />
           </Drawer>
         </TabPanel>
