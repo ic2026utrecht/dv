@@ -48,9 +48,7 @@ const incidentTypes = computed(() =>
   filterIncidentTypes(config.value?.incidentTypes ?? [], department.value),
 )
 
-const helpOptions = computed(() =>
-  filterHelpOptions(config.value?.helpOptions ?? [], department.value),
-)
+const helpOptions = computed(() => config.value?.helpOptions ?? [])
 
 const locationSelectOptions = computed(() =>
   locationOptions(config.value?.locations ?? []),

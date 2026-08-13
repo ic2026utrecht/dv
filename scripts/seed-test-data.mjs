@@ -127,11 +127,8 @@ function firstOf(list, predicate) {
   return list.find(predicate)
 }
 
-function helpForDepartment(helpOptions, department, count = 1) {
-  return helpOptions
-    .filter(h => (h.departments ?? []).includes(department))
-    .slice(0, count)
-    .map(h => h.id)
+function helpIds(helpOptions, count = 1) {
+  return helpOptions.slice(0, count).map(h => h.id)
 }
 
 function buildSamples(config) {
@@ -144,9 +141,9 @@ function buildSamples(config) {
       t => t.department === dept && t.name.toLowerCase().includes(namePart.toLowerCase()),
     ) ?? firstOf(incidentTypes, t => t.department === dept)
 
-  const parkeerHelp = helpForDepartment(helpOptions, 'Parkeer', 2)
-  const dienstHelp = helpForDepartment(helpOptions, 'Dienstverlening', 1)
-  const ehboHelp = helpForDepartment(helpOptions, 'EHBO', 1)
+  const parkeerHelp = helpIds(helpOptions, 2)
+  const dienstHelp = helpIds(helpOptions, 1)
+  const ehboHelp = helpIds(helpOptions, 1)
 
   return [
     {

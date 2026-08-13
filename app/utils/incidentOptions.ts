@@ -1,4 +1,4 @@
-import type { Department, HelpOption, IncidentType, Location, SelectOption } from '~/types/models'
+import type { Department, IncidentType, Location, SelectOption } from '~/types/models'
 
 export const RASTER_ROWS = 'ABCDEFGHIJKLM'.split('')
 export const RASTER_COLUMNS = Array.from({ length: 22 }, (_, i) => i + 1)
@@ -65,14 +65,6 @@ export function filterIncidentTypes(
 ): IncidentType[] {
   if (!department) return []
   return types.filter((t) => t.department === department)
-}
-
-export function filterHelpOptions(
-  options: HelpOption[],
-  department: Department | null,
-): HelpOption[] {
-  if (!department) return []
-  return options.filter((o) => o.departments.includes(department))
 }
 
 export function toSelectOptions(items: { id: string, name: string }[]): SelectOption[] {

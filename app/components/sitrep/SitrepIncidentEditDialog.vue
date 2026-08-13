@@ -3,7 +3,6 @@ import type { Incident, IncidentUpdate } from '~/types/models'
 import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
 import {
   buildSectorOptions,
-  filterHelpOptions,
   filterIncidentTypes,
   locationOptions,
   parseSectorCode,
@@ -147,7 +146,7 @@ const incidentTypeOptions = computed(() =>
 )
 
 const helpSelectOptions = computed(() =>
-  toSelectOptions(filterHelpOptions(config.value?.helpOptions ?? [], form.department)),
+  toSelectOptions(config.value?.helpOptions ?? []),
 )
 
 const parsedSector = computed(() =>

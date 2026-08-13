@@ -459,16 +459,19 @@ function defaultIncidentTypes_() {
 
 function defaultHelpOptions_() {
   var names = [
-    'EHBO', 'Beveiliging Jaarbeurs', '112 gebeld',
-    'Afd. HC Safety gebeld', 'Reiniging of installatie gebeld'
+    'EHBO',
+    'Beveiliging Jaarbeurs',
+    'Afd. HC Safety gebeld',
+    'Reiniging of installatie gebeld',
+    '112 gebeld',
+    '112 gebeld - critical'
   ];
+  var allDepartments = ['Parkeer', 'Dienstverlening', 'EHBO'];
   return names.map(function (name) {
     return {
       id: slugId_('help-' + name),
       name: name,
-      departments: name === 'EHBO'
-        ? ['EHBO']
-        : ['Parkeer', 'Dienstverlening', 'EHBO']
+      departments: allDepartments
     };
   });
 }
