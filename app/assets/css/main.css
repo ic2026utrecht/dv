@@ -182,6 +182,18 @@ body {
   color: #64748b;
 }
 
+/* Chip MultiSelect: wrap selected items instead of clipping overflow */
+.p-multiselect-display-chip .p-multiselect-label-container {
+  overflow: visible;
+}
+
+.p-multiselect-display-chip .p-multiselect-label {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  flex-wrap: wrap;
+}
+
 /* Choice buttons (custom — not PrimeVue SelectButton) */
 .ic-choice-row {
   display: grid;
