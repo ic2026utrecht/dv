@@ -631,6 +631,27 @@ body {
   background: var(--ic-surface);
 }
 
+.ic-sitrep-list__controls--desktop {
+  display: grid;
+}
+
+.ic-sitrep-list-filters-drawer.p-drawer {
+  height: auto;
+  max-height: min(85dvh, 32rem);
+}
+
+.ic-sitrep-list-filters-drawer .p-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 0 1rem 1rem;
+}
+
+.ic-sitrep-list-filters-drawer__actions {
+  flex-shrink: 0;
+  padding-top: 0.25rem;
+}
+
 .ic-sitrep-list__controls .ic-field {
   min-width: 0;
 }

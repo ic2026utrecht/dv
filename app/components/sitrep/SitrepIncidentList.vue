@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { Incident, IncidentUpdate } from '~/types/models'
-import { DEPARTMENTS, PRIORITIES } from '~/constants/incident'
-import type { SitrepSortKey } from '~/utils/sitrepFilters'
+import { DEFAULT_SITREP_LIST_FILTERS } from '~/utils/sitrepFilters'
 import { getIncidentSeverity, severityDotClass, severityLabel, severityRowBtnClass } from '~/utils/sitrepColors'
 
 const { incidents, updateIncident } = useSitrep()
-const { filters, setFilter, filterIncidents } = useSitrepQuery()
+const { filters, filterIncidents } = useSitrepQuery()
+
+const filtersDrawerOpen = ref(false)
 
 const selectedIncident = ref<Incident | null>(null)
 const statusIncident = ref<Incident | null>(null)
@@ -17,6 +18,26 @@ const saveError = ref<string | null>(null)
 const statusSaveError = ref<string | null>(null)
 
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (filters.value.department.length > 0) {
+    count++
+  }
+  if (filters.value.priority.length > 0) {
+    count++
+  }
+  if (
+    filters.value.status.length !== DEFAULT_SITREP_LIST_FILTERS.status.length
+    || filters.value.status.some((value, index) => value !== DEFAULT_SITREP_LIST_FILTERS.status[index])
+  ) {
+    count++
+  }
+  if (filters.value.sort !== DEFAULT_SITREP_LIST_FILTERS.sort) {
+    count++
+  }
+  return count
+})
 
 watch(
   () => incidents.value,
@@ -31,24 +52,6 @@ watch(
     }
   },
 )
-
-const departmentOptions = DEPARTMENTS.map(d => ({ value: d, label: d }))
-
-const priorityOptions = PRIORITIES.map(p => ({ value: p, label: p }))
-
-const statusOptions = [
-  { value: 'open', label: 'Alleen open' },
-  { value: 'Open', label: 'Open' },
-  { value: 'In behandeling', label: 'In behandeling' },
-  { value: 'Afgesloten', label: 'Afgesloten' },
-]
-
-const sortOptions: { value: SitrepSortKey, label: string }[] = [
-  { value: 'priority', label: 'Prioriteit' },
-  { value: 'newest', label: 'Nieuwste' },
-  { value: 'oldest', label: 'Oudste' },
-  { value: 'age', label: 'Langst open' },
-]
 
 function formatAge(minutes: number): string {
   if (minutes < 60) {
@@ -138,58 +141,48 @@ async function handleStatusSave(payload: IncidentUpdate) {
 
 <template>
   <section class="ic-sitrep-list ic-sitrep-list--panel">
-    <div class="ic-sitrep-list__controls">
-      <IcFormField label="Afdeling" html-for="sitrep-filter-department">
-        <MultiSelect
-          id="sitrep-filter-department"
-          :model-value="filters.department"
-          :options="departmentOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Alle afdelingen"
-          display="chip"
-          class="ic-sitrep-list__filter"
-          @update:model-value="setFilter('department', $event)"
-        />
-      </IcFormField>
-      <IcFormField label="Prioriteit" html-for="sitrep-filter-priority">
-        <MultiSelect
-          id="sitrep-filter-priority"
-          :model-value="filters.priority"
-          :options="priorityOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Alle prioriteiten"
-          display="chip"
-          class="ic-sitrep-list__filter"
-          @update:model-value="setFilter('priority', $event)"
-        />
-      </IcFormField>
-      <IcFormField label="Status" html-for="sitrep-filter-status">
-        <MultiSelect
-          id="sitrep-filter-status"
-          :model-value="filters.status"
-          :options="statusOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Alle statussen"
-          display="chip"
-          class="ic-sitrep-list__filter"
-          @update:model-value="setFilter('status', $event)"
-        />
-      </IcFormField>
-      <IcFormField label="Sorteren" html-for="sitrep-filter-sort">
-        <Select
-          id="sitrep-filter-sort"
-          :model-value="filters.sort"
-          :options="sortOptions"
-          option-label="label"
-          option-value="value"
-          class="ic-sitrep-list__filter"
-          @update:model-value="setFilter('sort', $event)"
-        />
-      </IcFormField>
+    <div class="ic-sitrep-list__controls-bar">
+      <button
+        type="button"
+        class="ic-sitrep-list__filters-btn"
+        :class="{ 'ic-sitrep-list__filters-btn--active': activeFilterCount > 0 }"
+        aria-label="Filters en sorteren"
+        @click="filtersDrawerOpen = true"
+      >
+        <i class="pi pi-sliders-h" aria-hidden="true" />
+        <span
+          v-if="activeFilterCount > 0"
+          class="ic-sitrep-list__filters-badge"
+        >
+          {{ activeFilterCount }}
+        </span>
+      </button>
+      <span class="ic-sitrep-list__summary">
+        {{ filteredIncidents.length }} melding{{ filteredIncidents.length === 1 ? '' : 'en' }}
+      </span>
     </div>
+
+    <div class="ic-sitrep-list__controls ic-sitrep-list__controls--desktop">
+      <SitrepIncidentListFilters />
+    </div>
+
+    <Drawer
+      v-model:visible="filtersDrawerOpen"
+      position="bottom"
+      header="Filters & sorteren"
+      class="ic-sitrep-list-filters-drawer"
+      :block-scroll="true"
+      :dismissable-mask="true"
+    >
+      <SitrepIncidentListFilters v-if="filtersDrawerOpen" id-prefix="mobile-" />
+      <div class="ic-sitrep-list-filters-drawer__actions">
+        <Button
+          label="Klaar"
+          class="w-full"
+          @click="filtersDrawerOpen = false"
+        />
+      </div>
+    </Drawer>
 
     <div class="ic-sitrep-list__scroll">
       <p v-if="filteredIncidents.length === 0" class="ic-sitrep-list__empty">
@@ -281,6 +274,81 @@ async function handleStatusSave(payload: IncidentUpdate) {
 
 .ic-sitrep-list__controls {
   flex-shrink: 0;
+}
+
+.ic-sitrep-list__controls-bar {
+  display: none;
+}
+
+.ic-sitrep-list__filters-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgb(135 161 198 / 0.45);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--ic-brand-dark);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.ic-sitrep-list__filters-btn--active {
+  border-color: var(--ic-orange);
+  color: var(--ic-brand);
+  background: rgb(230 151 50 / 0.08);
+}
+
+.ic-sitrep-list__filters-badge {
+  position: absolute;
+  top: -0.3125rem;
+  right: -0.3125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.25rem;
+  border-radius: 9999px;
+  background: var(--ic-orange);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ic-sitrep-list__summary {
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .ic-sitrep-list__controls-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgb(135 161 198 / 0.2);
+    background: var(--ic-surface);
+  }
+
+  .ic-sitrep-list__controls--desktop {
+    display: none;
+  }
+}
+
+@media (min-width: 901px) {
+  .ic-sitrep-list-filters-drawer {
+    display: none;
+  }
 }
 
 .ic-sitrep-list__scroll {
