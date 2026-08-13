@@ -1,0 +1,1 @@
+import{aq as i,ar as u,p as t,as as n}from"./_CJor-JS.js";import{u as o}from"./BC9DFfm1.js";const m=i(async()=>{let e,a;if(!u().value)return t("/login?redirect=/admin");const{fetchMe:s,isAdmin:r}=o();if([e,a]=n(()=>s()),await e,a(),!r.value)return t("/sitrep")});export{m as default};
