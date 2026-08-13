@@ -13,7 +13,7 @@ const hoveredSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
 
-const pinchZoom = usePinchZoom({ maxScale: 8 })
+const pinchZoom = usePinchZoom({ maxScale: 2.5 })
 const {
   scale,
   transformStyle,
@@ -26,7 +26,7 @@ const {
   onPointerUp,
 } = pinchZoom
 
-const { fitScale, resetMapView } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
+const { fitScale, resetMapView, stageSizeStyle } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
 
 const markerLayerStyle = computed(() => ({
   '--map-scale': scale.value,
@@ -154,7 +154,7 @@ function formatTime(timestamp: string): string {
         @pointerup="onPointerUp"
         @pointercancel="onPointerUp"
       >
-        <div class="ic-sitrep-map__stage" :style="transformStyle">
+        <div class="ic-sitrep-map__stage" :style="[transformStyle, stageSizeStyle]">
           <img
             ref="imageRef"
             :src="rasterMap"
@@ -343,7 +343,6 @@ function formatTime(timestamp: string): string {
 
 .ic-sitrep-map__stage {
   position: relative;
-  width: 100%;
   flex-shrink: 0;
   transform-origin: center center;
   will-change: transform;
@@ -352,7 +351,7 @@ function formatTime(timestamp: string): string {
 .ic-sitrep-map__image {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   max-width: none;
   pointer-events: none;
   opacity: 0.7;

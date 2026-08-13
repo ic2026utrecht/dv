@@ -31,7 +31,7 @@ const stageRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
 const pendingSector = ref<string | null>(null)
 
-const pinchZoom = usePinchZoom({ maxScale: 8 })
+const pinchZoom = usePinchZoom({ maxScale: 2.5 })
 const {
   transformStyle,
   reset,
@@ -45,7 +45,7 @@ const {
   onPointerUp,
 } = pinchZoom
 
-const { updateMapFit, resetMapView } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
+const { updateMapFit, resetMapView, stageSizeStyle } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
 
 function focusAllowedRegion() {
   if (!props.allowedSectors?.length) {
@@ -215,7 +215,7 @@ function handlePointerUp(event: PointerEvent) {
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerUp"
     >
-      <div ref="stageRef" class="ic-raster-dialog__stage" :style="transformStyle">
+      <div ref="stageRef" class="ic-raster-dialog__stage" :style="[transformStyle, stageSizeStyle]">
         <img
           ref="imageRef"
           :src="rasterMap"
@@ -352,7 +352,6 @@ function handlePointerUp(event: PointerEvent) {
 
 .ic-raster-dialog__stage {
   position: relative;
-  width: 100%;
   flex-shrink: 0;
   transform-origin: center center;
   will-change: transform;
@@ -361,7 +360,7 @@ function handlePointerUp(event: PointerEvent) {
 .ic-raster-dialog__image {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   max-width: none;
   pointer-events: none;
 }

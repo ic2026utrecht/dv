@@ -10,6 +10,21 @@ export function useSitrepMapFit(
   },
 ) {
   const fitScale = ref(1)
+  const contentSize = ref<{ width: number, height: number } | null>(null)
+
+  /**
+   * Stage is sized to the image's natural pixels so CSS zoom scales a high-res
+   * bitmap (viewport-width stages look soft on mobile when pinch-zoomed).
+   */
+  const stageSizeStyle = computed(() => {
+    if (!contentSize.value) {
+      return { width: '100%' as const }
+    }
+    return {
+      width: `${contentSize.value.width}px`,
+      height: `${contentSize.value.height}px`,
+    }
+  })
 
   function updateMapFit() {
     const viewport = viewportRef.value
@@ -24,10 +39,11 @@ export function useSitrepMapFit(
       return
     }
 
-    const contentW = viewportW
-    const contentH = viewportW * (img.naturalHeight / img.naturalWidth)
-    const nextFit = contentH > viewportH ? viewportH / contentH : 1
+    const contentW = img.naturalWidth
+    const contentH = img.naturalHeight
+    contentSize.value = { width: contentW, height: contentH }
 
+    const nextFit = Math.min(viewportW / contentW, viewportH / contentH)
     fitScale.value = nextFit
 
     pinchZoom.setClampBounds(() => ({
@@ -40,7 +56,6 @@ export function useSitrepMapFit(
     pinchZoom.setMinScale(nextFit)
 
     const isAtDefaultZoom = Math.abs(pinchZoom.scale.value - fitScale.value) < 0.01
-      || Math.abs(pinchZoom.scale.value - 1) < 0.01
       || pinchZoom.scale.value < nextFit
 
     if (isAtDefaultZoom) {
@@ -82,6 +97,8 @@ export function useSitrepMapFit(
 
   return {
     fitScale,
+    contentSize,
+    stageSizeStyle,
     updateMapFit,
     resetMapView,
   }
