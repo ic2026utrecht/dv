@@ -439,6 +439,10 @@ body {
   font: inherit;
 }
 
+.ic-staff-nav-drawer .ic-staff-nav-mobile .ic-wa-nav-badge {
+  margin-left: 0;
+}
+
 .ic-header-logo {
   @apply shrink-0;
   width: 4.5rem;
@@ -1040,38 +1044,59 @@ body {
 }
 
 @media (max-width: 900px) {
-  .ic-shell--sitrep {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
   .ic-sitrep-split {
-    grid-template-columns: 1fr;
-    flex: none;
-    overflow: visible;
-  }
-
-  .ic-sitrep-split .ic-sitrep-map {
-    border-right: none;
-    border-bottom: 1px solid rgb(135 161 198 / 0.25);
-    height: auto;
-    overflow: visible;
-  }
-
-  .ic-sitrep-split .ic-sitrep-map__frame {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    height: 100%;
     min-height: 0;
+    overflow: hidden;
   }
 
   .ic-sitrep-split .ic-sitrep-list {
+    flex: 1 1 0;
+    min-height: 0;
     height: auto;
     max-height: none;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .ic-sitrep-split .ic-sitrep-list__scroll {
-    flex: none;
-    max-height: 24rem;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
   }
+}
+
+.ic-sitrep-map-drawer.p-drawer {
+  height: min(92dvh, 56rem);
+}
+
+.ic-sitrep-map-drawer.p-drawer .p-drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.ic-sitrep-map-drawer__hint {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 1rem 0.625rem;
+  font-size: 0.6875rem;
+  color: #94a3b8;
+}
+
+.ic-sitrep-map-drawer .ic-sitrep-map {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  border: none;
+}
+
+.ic-sitrep-map-drawer .ic-sitrep-map__header {
+  display: none;
 }

@@ -197,7 +197,7 @@ function submit() {
     modal
     :header="incident ? `${incident.incidentId} bewerken` : 'Incident'"
     class="ic-sitrep-edit-dialog"
-    :style="{ width: 'min(100vw - 2rem, 72rem)' }"
+    :style="{ width: 'min(100vw - 2rem, 84rem)' }"
     :draggable="false"
     :dismissable-mask="true"
     block-scroll
@@ -473,7 +473,7 @@ function submit() {
 
 .ic-sitrep-edit-dialog__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) min(22rem, 34vw);
+  grid-template-columns: minmax(0, 1fr) minmax(30rem, 42%);
   grid-template-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
@@ -584,8 +584,8 @@ function submit() {
 .ic-sitrep-edit-dialog.p-dialog {
   display: flex;
   flex-direction: column;
-  height: min(90dvh, 820px);
-  max-height: min(90dvh, 820px);
+  height: min(92dvh, 880px);
+  max-height: min(92dvh, 880px);
 }
 
 .ic-sitrep-edit-dialog.p-dialog .p-dialog-content {

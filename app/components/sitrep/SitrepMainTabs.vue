@@ -11,6 +11,11 @@ const activeTab = computed({
 
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
 const openCount = computed(() => incidents.value.filter(i => i.isOpen).length)
+const mapDrawerOpen = ref(false)
+
+const mapIncidentCount = computed(() =>
+  filteredIncidents.value.filter(incident => incident.sector).length,
+)
 </script>
 
 <template>
@@ -36,9 +41,48 @@ const openCount = computed(() => incidents.value.filter(i => i.isOpen).length)
       <TabPanels :lazy="false">
         <TabPanel value="map">
           <div class="ic-sitrep-split">
-            <SitrepMap :incidents="incidents" />
+            <button
+              type="button"
+              class="ic-sitrep-map-trigger"
+              aria-haspopup="dialog"
+              :aria-expanded="mapDrawerOpen"
+              @click="mapDrawerOpen = true"
+            >
+              <span class="ic-sitrep-map-trigger__icon" aria-hidden="true">
+                <i class="pi pi-map" />
+              </span>
+              <span class="ic-sitrep-map-trigger__copy">
+                <span class="ic-sitrep-map-trigger__title">Kaartoverzicht</span>
+                <span class="ic-sitrep-map-trigger__meta">
+                  {{ mapIncidentCount }} op kaart
+                  <span v-if="mapIncidentCount !== filteredIncidents.length">
+                    · {{ filteredIncidents.length }} totaal
+                  </span>
+                </span>
+              </span>
+              <span class="ic-sitrep-map-trigger__action">
+                Openen
+                <i class="pi pi-arrow-up" aria-hidden="true" />
+              </span>
+            </button>
+
+            <SitrepMap class="ic-sitrep-split__map-inline" :incidents="incidents" />
             <SitrepIncidentList />
           </div>
+
+          <Drawer
+            v-model:visible="mapDrawerOpen"
+            position="bottom"
+            header="Kaartoverzicht"
+            class="ic-sitrep-map-drawer"
+            :block-scroll="true"
+            :dismissable-mask="true"
+          >
+            <p class="ic-sitrep-map-drawer__hint">
+              Knijp om te zoomen · sleep om te verschuiven
+            </p>
+            <SitrepMap v-if="mapDrawerOpen" :incidents="incidents" />
+          </Drawer>
         </TabPanel>
         <TabPanel value="timeline">
           <SitrepTimeline :incidents="filteredIncidents" embedded />
@@ -149,5 +193,88 @@ const openCount = computed(() => incidents.value.filter(i => i.isOpen).length)
   min-height: 12rem;
   color: var(--ic-brand);
   font-size: 0.8125rem;
+}
+
+.ic-sitrep-map-trigger {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .ic-sitrep-split__map-inline {
+    display: none;
+  }
+
+  .ic-sitrep-map-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-bottom: 1px solid rgb(135 161 198 / 0.25);
+    background:
+      linear-gradient(135deg, rgb(45 46 126 / 0.06), rgb(230 151 50 / 0.08)),
+      var(--ic-surface);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .ic-sitrep-map-trigger:hover,
+  .ic-sitrep-map-trigger:focus-visible {
+    background:
+      linear-gradient(135deg, rgb(45 46 126 / 0.1), rgb(230 151 50 / 0.12)),
+      var(--ic-surface);
+    outline: none;
+  }
+
+  .ic-sitrep-map-trigger__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.625rem;
+    background: var(--ic-brand);
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  .ic-sitrep-map-trigger__copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .ic-sitrep-map-trigger__title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--ic-brand-dark);
+  }
+
+  .ic-sitrep-map-trigger__meta {
+    font-size: 0.6875rem;
+    color: #64748b;
+  }
+
+  .ic-sitrep-map-trigger__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    padding: 0.375rem 0.625rem;
+    border-radius: 9999px;
+    background: #fff;
+    border: 1px solid rgb(135 161 198 / 0.35);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--ic-brand);
+  }
 }
 </style>
