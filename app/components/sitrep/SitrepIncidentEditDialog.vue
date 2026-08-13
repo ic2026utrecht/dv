@@ -106,8 +106,12 @@ watch(
 
 const updatesRefreshKey = ref(0)
 
+type EditDialogTab = 'form' | 'updates'
+const editTab = ref<EditDialogTab>('form')
+
 watch(visible, (open) => {
   if (open) {
+    editTab.value = 'form'
     updatesRefreshKey.value += 1
     if (!config.value) {
       fetchConfig().catch(() => {})
@@ -212,8 +216,21 @@ function submit() {
       </div>
 
       <div v-else class="ic-sitrep-edit-dialog__body">
-        <div class="ic-sitrep-edit-dialog__layout">
-          <div class="ic-sitrep-edit-dialog__form ic-form">
+        <Tabs v-model:value="editTab" class="ic-sitrep-edit-dialog__tabs">
+          <TabList>
+            <Tab value="form">
+              <i class="pi pi-file-edit mr-1.5" aria-hidden="true" />
+              Gegevens
+            </Tab>
+            <Tab value="updates">
+              <i class="pi pi-comments mr-1.5" aria-hidden="true" />
+              Updates
+            </Tab>
+          </TabList>
+
+          <TabPanels :lazy="false">
+            <TabPanel value="form">
+              <div class="ic-sitrep-edit-dialog__form ic-form">
         <section class="ic-sitrep-edit-dialog__section">
           <h3 class="ic-sitrep-edit-dialog__heading">
             Identificatie
@@ -426,16 +443,20 @@ function submit() {
           id-prefix="sitrep-edit"
         />
 
-        </div>
+              </div>
+            </TabPanel>
 
-        <aside class="ic-sitrep-edit-dialog__feed">
-          <SitrepIncidentUpdateFeed
-            :incident="incident"
-            :refresh-key="updatesRefreshKey"
-            @note-added="handleNoteAdded"
-          />
-        </aside>
-        </div>
+            <TabPanel value="updates">
+              <aside class="ic-sitrep-edit-dialog__feed">
+                <SitrepIncidentUpdateFeed
+                  :incident="incident"
+                  :refresh-key="updatesRefreshKey"
+                  @note-added="handleNoteAdded"
+                />
+              </aside>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
       </div>
     </template>
 
@@ -471,7 +492,44 @@ function submit() {
   padding: 0.5rem 0;
 }
 
-.ic-sitrep-edit-dialog__layout {
+.ic-sitrep-edit-dialog__tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ic-sitrep-edit-dialog__tabs :deep(.p-tablist) {
+  display: none;
+  flex-shrink: 0;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  background: transparent;
+  border-bottom: 1px solid rgb(135 161 198 / 0.25);
+}
+
+.ic-sitrep-edit-dialog__tabs :deep(.p-tablist-tab-list) {
+  width: 100%;
+  gap: 0.25rem;
+}
+
+.ic-sitrep-edit-dialog__tabs :deep(.p-tab) {
+  flex: 1 1 0;
+  justify-content: center;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+}
+
+.ic-sitrep-edit-dialog__tabs :deep(.p-tab.p-tab-active) {
+  color: var(--ic-brand-dark);
+  border-bottom-color: var(--ic-orange);
+}
+
+.ic-sitrep-edit-dialog__tabs :deep(.p-tabpanels) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(30rem, 42%);
   grid-template-rows: minmax(0, 1fr);
@@ -480,10 +538,23 @@ function submit() {
   overflow: hidden;
 }
 
+.ic-sitrep-edit-dialog__tabs :deep(.p-tabpanel) {
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (min-width: 961px) {
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tabpanel) {
+    display: flex !important;
+  }
+}
+
 .ic-sitrep-edit-dialog__form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  flex: 1;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -495,6 +566,7 @@ function submit() {
 .ic-sitrep-edit-dialog__feed {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
   padding: 0 0 0 1rem;
@@ -502,19 +574,57 @@ function submit() {
 }
 
 @media (max-width: 960px) {
-  .ic-sitrep-edit-dialog__layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) min(18rem, 38dvh);
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tablist) {
+    display: flex;
+    margin: 0;
   }
 
-  .ic-sitrep-edit-dialog__form {
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tab) {
+    padding: 0.5rem 0.625rem;
+  }
+
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tabpanels) {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
     padding: 0;
   }
 
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tabpanel) {
+    flex: 1 1 0;
+  }
+
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tabpanel:not(.p-tabpanel-active)) {
+    display: none !important;
+  }
+
+  .ic-sitrep-edit-dialog__tabs :deep(.p-tabpanel.p-tabpanel-active) {
+    display: flex !important;
+  }
+
+  .ic-sitrep-edit-dialog__form {
+    gap: 0.625rem;
+    padding: 0 0.5rem;
+  }
+
   .ic-sitrep-edit-dialog__feed {
-    padding: 0.75rem 0 0;
+    padding: 0;
     border-left: 0;
-    border-top: 1px solid rgb(135 161 198 / 0.25);
+  }
+
+  .ic-sitrep-edit-dialog__feed :deep(.ic-update-feed) {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .ic-sitrep-edit-dialog__section {
+    padding: 0.625rem;
+    border-radius: 0.375rem;
+  }
+
+  .ic-sitrep-edit-dialog__loading {
+    padding: 0.5rem 0.625rem;
   }
 }
 
@@ -598,5 +708,31 @@ function submit() {
 
 .ic-sitrep-edit-dialog.p-dialog .p-dialog-footer {
   flex-shrink: 0;
+}
+
+@media (max-width: 960px) {
+  .ic-sitrep-edit-dialog.p-dialog {
+    width: calc(100vw - 0.5rem) !important;
+    height: min(94dvh, 900px);
+    max-height: min(94dvh, 900px);
+  }
+
+  .ic-sitrep-edit-dialog.p-dialog .p-dialog-header {
+    padding: 0.5rem 0.625rem;
+  }
+
+  .ic-sitrep-edit-dialog.p-dialog .p-dialog-title {
+    font-size: 0.9375rem;
+  }
+
+  .ic-sitrep-edit-dialog.p-dialog .p-dialog-content,
+  .ic-sitrep-edit-dialog.p-dialog .ic-sitrep-edit-dialog__content {
+    padding: 0 !important;
+  }
+
+  .ic-sitrep-edit-dialog.p-dialog .p-dialog-footer {
+    padding: 0.5rem 0.625rem;
+    gap: 0.375rem;
+  }
 }
 </style>
