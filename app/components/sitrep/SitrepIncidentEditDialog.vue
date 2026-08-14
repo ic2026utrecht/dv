@@ -875,8 +875,8 @@ function submit() {
 .ic-sitrep-edit-dialog.p-dialog {
   display: flex;
   flex-direction: column;
-  height: min(92dvh, 880px);
-  max-height: min(92dvh, 880px);
+  height: min(90vh, 880px);
+  max-height: min(90vh, 880px);
 }
 
 .ic-sitrep-edit-dialog.p-dialog .p-dialog-content {
@@ -894,8 +894,8 @@ function submit() {
 @media (max-width: 960px) {
   .ic-sitrep-edit-dialog.p-dialog {
     width: calc(100vw - 0.5rem) !important;
-    height: min(94dvh, 900px);
-    max-height: min(94dvh, 900px);
+    height: min(90vh, 900px);
+    max-height: min(90vh, 900px);
   }
 
   .ic-sitrep-edit-dialog.p-dialog .p-dialog-header {

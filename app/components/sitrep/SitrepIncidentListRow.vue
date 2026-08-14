@@ -141,7 +141,7 @@ function statusButtonLabel(status: string): string {
           <span>{{ incident.status || 'Open' }}</span>
         </div>
       </div>
-      <i class="pi pi-chevron-right ic-sitrep-row-btn__icon" aria-hidden="true" />
+   
     </button>
     <button
       type="button"
