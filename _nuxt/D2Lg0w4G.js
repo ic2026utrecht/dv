@@ -1,0 +1,1 @@
+import{av as i,aw as u,i as s,ax as n}from"./BEU-A1za.js";import{u as o}from"./9PbbcAdV.js";const m=i(async()=>{let e,a;if(!u().value)return s("/login?redirect=/admin/users");const{fetchMe:t,isAdmin:r}=o();if([e,a]=n(()=>t()),await e,a(),!r.value)return s("/sitrep")});export{m as default};
