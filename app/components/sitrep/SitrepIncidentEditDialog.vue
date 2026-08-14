@@ -29,6 +29,7 @@ const emit = defineEmits<{
 const { fetchConfig, config, loading: configLoading } = useIncidents()
 const { displayName, fetchMe } = useStaffAuth()
 const { markRead } = useIncidentFeedUnread()
+const { incidents } = useSitrep()
 
 const form = reactive<IncidentEditForm>({
   timestamp: '',
@@ -52,6 +53,7 @@ const form = reactive<IncidentEditForm>({
   deadline: '',
   closedBy: '',
   closureResult: '',
+  parentId: '',
 })
 
 const STATUS_OPTIONS = [
@@ -217,6 +219,42 @@ const showSectorLabel = computed(() => Boolean(form.sectorCode && !parsedSector.
 
 const isClosed = computed(() => form.status === 'Afgesloten')
 
+const linkedChildren = computed(() => {
+  const id = props.incident?.incidentId
+  if (!id) {
+    return []
+  }
+  return incidents.value
+    .filter(incident => incident.parentId === id)
+    .slice()
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+})
+
+const hasLinkedChildren = computed(() => linkedChildren.value.length > 0)
+
+const parentSelectOptions = computed(() => {
+  const currentId = props.incident?.incidentId
+  const selectedParentId = form.parentId
+  const options = incidents.value
+    .filter((incident) => {
+      if (incident.incidentId === currentId || incident.parentId) {
+        return false
+      }
+      return incident.isOpen || incident.incidentId === selectedParentId
+    })
+    .map(incident => ({
+      value: incident.incidentId,
+      label: `${incident.incidentId} · ${incident.incidentTypeName} · ${incident.locationName}`,
+    }))
+
+  return [
+    { value: '', label: 'Hoofdincident (geen groep)' },
+    ...options,
+  ]
+})
+
+const parentSelectDisabled = computed(() => hasLinkedChildren.value)
+
 function formatReadOnlyTime(value?: string): string {
   if (!value) {
     return '—'
@@ -313,6 +351,49 @@ function submit() {
               <dd>{{ incident.isOpen ? `${Math.round(incident.ageMinutes)} min` : 'Afgesloten' }}</dd>
             </div>
           </dl>
+        </section>
+
+        <section class="ic-sitrep-edit-dialog__section">
+          <h3 class="ic-sitrep-edit-dialog__heading">
+            Groepering
+          </h3>
+
+          <IcFormField
+            label="Hoofdincident"
+            html-for="sitrep-edit-parent"
+            :hint="parentSelectDisabled
+              ? 'Dit incident heeft sub-incidenten en kan niet onder een ander incident worden geplaatst.'
+              : 'Koppel dit incident als sub aan een bestaand hoofdincident.'"
+          >
+            <Select
+              id="sitrep-edit-parent"
+              v-model="form.parentId"
+              :options="parentSelectOptions"
+              option-label="label"
+              option-value="value"
+              :disabled="parentSelectDisabled"
+              filter
+              show-clear
+              placeholder="Hoofdincident (geen groep)"
+              class="ic-field w-full"
+            />
+          </IcFormField>
+
+          <div v-if="hasLinkedChildren" class="ic-sitrep-edit-dialog__children">
+            <p class="ic-sitrep-edit-dialog__children-label">
+              Sub-incidenten
+            </p>
+            <ul class="ic-sitrep-edit-dialog__children-list">
+              <li
+                v-for="child in linkedChildren"
+                :key="child.incidentId"
+              >
+                <span class="ic-sitrep-edit-dialog__children-id">{{ child.incidentId }}</span>
+                <span>{{ child.incidentTypeName }}</span>
+                <span class="ic-sitrep-edit-dialog__children-status">{{ child.status || 'Open' }}</span>
+              </li>
+            </ul>
+          </div>
         </section>
 
         <section class="ic-sitrep-edit-dialog__section">
@@ -720,6 +801,45 @@ function submit() {
   margin-top: 0.125rem;
   font-weight: 600;
   color: #334155;
+}
+
+.ic-sitrep-edit-dialog__children {
+  margin-top: 1rem;
+}
+
+.ic-sitrep-edit-dialog__children-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ic-sitrep-edit-dialog__children-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.ic-sitrep-edit-dialog__children-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+.ic-sitrep-edit-dialog__children-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ic-sitrep-edit-dialog__children-status {
+  color: #64748b;
 }
 
 .ic-sitrep-edit-dialog__flags {

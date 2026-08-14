@@ -78,6 +78,7 @@ export interface Incident {
   sourceRow: string
   latitude: number | null
   longitude: number | null
+  parentId?: string | null
 }
 
 export interface SitrepSummary {
@@ -151,6 +152,7 @@ export interface IncidentUpdate {
   closureResult?: string
   latitude?: number | null
   longitude?: number | null
+  parentId?: string | null
 }
 
 export interface IncidentUpdateResult {

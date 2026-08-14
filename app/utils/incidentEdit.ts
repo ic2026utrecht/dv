@@ -34,6 +34,7 @@ export interface IncidentEditForm {
   deadline: string
   closedBy: string
   closureResult: string
+  parentId: string
 }
 
 function normalizeName(value: string): string {
@@ -157,6 +158,7 @@ export function incidentToEditForm(
     deadline: toDatetimeLocalValue(incident.deadline),
     closedBy: incident.closedBy || '',
     closureResult: incident.closureResult || '',
+    parentId: incident.parentId || '',
   }
 }
 
@@ -193,5 +195,6 @@ export function editFormToIncidentUpdate(
     deadline: fromDatetimeLocalValue(form.deadline),
     closedBy: form.closedBy.trim() || undefined,
     closureResult: form.closureResult.trim() || undefined,
+    parentId: (form.parentId ?? '').trim() || null,
   }
 }

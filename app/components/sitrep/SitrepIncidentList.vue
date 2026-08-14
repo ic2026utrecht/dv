@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { Incident, IncidentUpdate } from '~/types/models'
+import { buildSitrepListEntries, type IncidentGroup } from '~/utils/incidentGrouping'
 import { DEFAULT_SITREP_LIST_FILTERS } from '~/utils/sitrepFilters'
-import { getIncidentSeverity, severityDotClass, severityLabel, severityRowBtnClass } from '~/utils/sitrepColors'
+import { getHighestSeverity, getIncidentSeverity } from '~/utils/sitrepColors'
+
+const EXPANDED_STORAGE_KEY = 'sitrep-group-expanded'
 
 const { incidents, updateIncident } = useSitrep()
 const { filters, filterIncidents } = useSitrepQuery()
@@ -18,7 +21,13 @@ const statusSaving = ref(false)
 const saveError = ref<string | null>(null)
 const statusSaveError = ref<string | null>(null)
 
+const expandedOverrides = ref<Record<string, boolean>>(loadExpandedOverrides())
+
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
+
+const listEntries = computed(() =>
+  buildSitrepListEntries(filteredIncidents.value, incidents.value, filters.value.sort),
+)
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -57,30 +66,61 @@ watch(
   },
 )
 
-function formatAge(minutes: number): string {
-  if (minutes < 60) {
-    return `${Math.round(minutes)} min`
+function loadExpandedOverrides(): Record<string, boolean> {
+  if (!import.meta.client) {
+    return {}
   }
-  const hours = Math.floor(minutes / 60)
-  const mins = Math.round(minutes % 60)
-  return mins > 0 ? `${hours}u ${mins}m` : `${hours}u`
+  try {
+    const raw = localStorage.getItem(EXPANDED_STORAGE_KEY)
+    if (!raw) {
+      return {}
+    }
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'),
+    )
+  }
+  catch {
+    return {}
+  }
 }
 
-function formatTime(timestamp: string): string {
-  const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) {
-    return timestamp
+function persistExpandedOverrides() {
+  if (!import.meta.client) {
+    return
   }
-  return date.toLocaleString('nl-NL', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(expandedOverrides.value))
 }
 
-function unreadBadgeLabel(count: number): string {
-  return count > 99 ? '99+' : String(count)
+function isGroupExpanded(group: IncidentGroup): boolean {
+  const stored = expandedOverrides.value[group.parent.incidentId]
+  if (typeof stored === 'boolean') {
+    return stored
+  }
+  return group.children.some(child => child.isOpen)
+}
+
+function toggleGroup(group: IncidentGroup) {
+  expandedOverrides.value = {
+    ...expandedOverrides.value,
+    [group.parent.incidentId]: !isGroupExpanded(group),
+  }
+  persistExpandedOverrides()
+}
+
+function groupUnreadCount(group: IncidentGroup): number {
+  return unreadCount(group.parent.incidentId)
+    + group.children.reduce((sum, child) => sum + unreadCount(child.incidentId), 0)
+}
+
+function groupSeverity(group: IncidentGroup) {
+  return getHighestSeverity([
+    getIncidentSeverity(group.parent),
+    ...group.children.map(child => getIncidentSeverity(child)),
+  ])
 }
 
 function openIncident(incident: Incident) {
@@ -93,23 +133,6 @@ function openStatusUpdate(incident: Incident) {
   statusIncident.value = incident
   statusSaveError.value = null
   statusDialogOpen.value = true
-}
-
-function statusIcon(status: string): string {
-  return 'pi-flag'
-}
-
-function statusButtonLabel(status: string): string {
-  switch (status) {
-    case 'Open':
-      return 'Status: Open — klik om bij te werken'
-    case 'In behandeling':
-      return 'Status: In behandeling — klik om bij te werken'
-    case 'Afgesloten':
-      return 'Status: Afgesloten — klik om bij te werken'
-    default:
-      return 'Status wijzigen'
-  }
 }
 
 async function handleSave(payload: IncidentUpdate) {
@@ -199,60 +222,55 @@ async function handleStatusSave(payload: IncidentUpdate) {
 
       <ul v-else class="ic-sitrep-list__items">
         <li
-          v-for="incident in filteredIncidents"
-          :key="incident.incidentId"
+          v-for="entry in listEntries"
+          :key="entry.kind === 'group' ? entry.group.parent.incidentId : entry.incident.incidentId"
         >
-          <div :class="['ic-sitrep-list__row', severityRowBtnClass(getIncidentSeverity(incident))]">
-            <span
-              v-if="unreadCount(incident.incidentId) > 0"
-              class="ic-sitrep-list__unread-badge"
-              :aria-label="`${unreadCount(incident.incidentId)} ongelezen updates`"
+          <template v-if="entry.kind === 'group'">
+            <SitrepIncidentListRow
+              variant="group"
+              :incident="entry.group.parent"
+              :unread-count="groupUnreadCount(entry.group)"
+              :child-count="entry.group.children.length"
+              :expanded="isGroupExpanded(entry.group)"
+              :severity="groupSeverity(entry.group)"
+              @open="openIncident(entry.group.parent)"
+              @status="openStatusUpdate(entry.group.parent)"
+              @toggle="toggleGroup(entry.group)"
+            />
+            <ul
+              v-show="isGroupExpanded(entry.group)"
+              class="ic-sitrep-list__children"
             >
-              {{ unreadBadgeLabel(unreadCount(incident.incidentId)) }}
-            </span>
-            <button
-              type="button"
-              class="ic-sitrep-list__open"
-              @click="openIncident(incident)"
-            >
-              <span :class="severityDotClass(getIncidentSeverity(incident))" aria-hidden="true" />
-              <div class="ic-sitrep-list__body">
-                <div class="ic-sitrep-list__top">
-                  <span class="ic-sitrep-list__id">{{ incident.incidentId }}</span>
-                  <span class="ic-sitrep-list__badge">{{ severityLabel(getIncidentSeverity(incident)) }}</span>
-                </div>
-                <p class="ic-sitrep-list__type">
-                  {{ incident.incidentTypeName }} · {{ incident.department }}
-                </p>
-                <p class="ic-sitrep-list__location">
-                  {{ incident.locationName }}
-                  <span v-if="incident.sector"> · {{ incident.sector }}</span>
-                </p>
-                <p v-if="incident.description" class="ic-sitrep-list__desc">
-                  {{ incident.description }}
-                </p>
-                <div class="ic-sitrep-list__meta">
-                  <span>{{ formatTime(incident.timestamp) }}</span>
-                  <span v-if="incident.isOpen">{{ formatAge(incident.ageMinutes) }} open</span>
-                  <span v-if="incident.actionOwner">Actie: {{ incident.actionOwner }}</span>
-                  <span>{{ incident.status || 'Open' }}</span>
-                </div>
-              </div>
-              <i class="pi pi-chevron-right ic-sitrep-row-btn__icon" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              :class="[
-                'ic-sitrep-list__status-btn',
-                `ic-sitrep-list__status-btn--${(incident.status || 'Open').toLowerCase().replace(/\s+/g, '-')}`
-              ]"
-              :title="statusButtonLabel(incident.status || 'Open')"
-              :aria-label="statusButtonLabel(incident.status || 'Open')"
-              @click="openStatusUpdate(incident)"
-            >
-              <i :class="['pi', statusIcon(incident.status || 'Open')]" aria-hidden="true" />
-            </button>
-          </div>
+              <li
+                v-for="child in entry.group.children"
+                :key="child.incidentId"
+              >
+                <SitrepIncidentListRow
+                  variant="child"
+                  :incident="child"
+                  :unread-count="unreadCount(child.incidentId)"
+                  @open="openIncident(child)"
+                  @status="openStatusUpdate(child)"
+                />
+              </li>
+            </ul>
+          </template>
+          <SitrepIncidentListRow
+            v-else-if="entry.kind === 'orphan'"
+            variant="orphan"
+            :incident="entry.incident"
+            :unread-count="unreadCount(entry.incident.incidentId)"
+            :parent-label="entry.parentLabel || entry.parentId"
+            @open="openIncident(entry.incident)"
+            @status="openStatusUpdate(entry.incident)"
+          />
+          <SitrepIncidentListRow
+            v-else
+            :incident="entry.incident"
+            :unread-count="unreadCount(entry.incident.incidentId)"
+            @open="openIncident(entry.incident)"
+            @status="openStatusUpdate(entry.incident)"
+          />
         </li>
       </ul>
     </div>
@@ -394,121 +412,14 @@ async function handleStatusSave(payload: IncidentUpdate) {
   flex-shrink: 0;
 }
 
-.ic-sitrep-list__row {
-  position: relative;
+.ic-sitrep-list__children {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0 0 0 1.25rem;
   display: flex;
-  align-items: stretch;
-  gap: 0.375rem;
-}
-
-.ic-sitrep-list__row.ic-sitrep-row-btn {
-  padding: 0;
-  gap: 0;
-}
-
-.ic-sitrep-list__open {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.ic-sitrep-list__row:hover .ic-sitrep-list__open {
-  box-shadow: none;
-}
-
-.ic-sitrep-list__row:hover {
-  box-shadow: inset 0 0 0 1px rgb(45 46 126 / 0.12);
-}
-
-.ic-sitrep-list__open:focus-visible {
-  outline: 2px solid var(--ic-brand);
-  outline-offset: 2px;
-}
-
-.ic-sitrep-list__unread-badge {
-  position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.125rem;
-  height: 1.125rem;
-  padding: 0 0.3125rem;
-  border-radius: 9999px;
-  background: var(--ic-orange);
-  color: #fff;
-  font-size: 0.625rem;
-  font-weight: 700;
-  line-height: 1;
-  pointer-events: none;
-}
-
-.ic-sitrep-list__status-btn {
-  flex-shrink: 0;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  margin-right: 0.375rem;
-  border: 1px solid rgb(135 161 198 / 0.45);
-  border-radius: 0.5rem;
-  background: rgb(255 255 255 / 0.85);
-  color: var(--ic-brand-dark);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.ic-sitrep-list__status-btn:hover {
-  background: #fff;
-  border-color: var(--ic-brand);
-  color: var(--ic-brand);
-}
-
-.ic-sitrep-list__status-btn:focus-visible {
-  outline: 2px solid var(--ic-brand);
-  outline-offset: 2px;
-}
-
-.ic-sitrep-list__status-btn--open {
-  color: #f97316;
-  border-color: rgb(249 115 22 / 0.3);
-}
-
-.ic-sitrep-list__status-btn--open:hover {
-  background: rgb(249 115 22 / 0.08);
-  border-color: #f97316;
-  color: #c2410c;
-}
-
-.ic-sitrep-list__status-btn--in-behandeling {
-  color: #22c55e;
-  border-color: rgb(34 197 94 / 0.3);
-}
-
-.ic-sitrep-list__status-btn--in-behandeling:hover {
-  background: rgb(34 197 94 / 0.08);
-  border-color: #22c55e;
-  color: #15803d;
-}
-
-.ic-sitrep-list__status-btn--afgesloten {
-  color: #64748b;
-  border-color: rgb(148 163 184 / 0.3);
-}
-
-.ic-sitrep-list__status-btn--afgesloten:hover {
-  background: rgb(148 163 184 / 0.1);
-  border-color: #64748b;
-  color: #475569;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-left: 2px solid rgb(135 161 198 / 0.35);
+  margin-left: 0.75rem;
 }
 </style>

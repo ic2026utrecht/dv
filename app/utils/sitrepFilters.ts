@@ -209,7 +209,7 @@ function matchesLocation(
   return selectedNames.includes(incident.locationName)
 }
 
-function compareIncidents(a: Incident, b: Incident, sort: SitrepSortKey): number {
+export function compareIncidents(a: Incident, b: Incident, sort: SitrepSortKey): number {
   switch (sort) {
     case 'newest':
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()

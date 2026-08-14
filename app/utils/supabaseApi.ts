@@ -70,6 +70,7 @@ interface IncidentViewRow {
   sector_column: number | null
   incident_type_id: string | null
   help_option_ids: string
+  parent_id: string | null
 }
 
 interface IncidentStatusUpdateRow {
@@ -188,6 +189,7 @@ function mapViewRow(row: IncidentViewRow): Incident {
     sourceRow: row.source_row ?? '',
     latitude: row.latitude ?? null,
     longitude: row.longitude ?? null,
+    parentId: row.parent_id || null,
   }
 }
 

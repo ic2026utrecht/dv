@@ -16,6 +16,30 @@ const statusSaveError = ref<string | null>(null)
 
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
 
+const childCountByParent = computed(() => {
+  const counts = new Map<string, number>()
+  for (const incident of incidents.value) {
+    const parentId = incident.parentId?.trim()
+    if (!parentId) {
+      continue
+    }
+    counts.set(parentId, (counts.get(parentId) ?? 0) + 1)
+  }
+  return counts
+})
+
+function groupingLabel(incident: Incident): string {
+  const parentId = incident.parentId?.trim()
+  if (parentId) {
+    return parentId
+  }
+  const childCount = childCountByParent.value.get(incident.incidentId) ?? 0
+  if (childCount > 0) {
+    return `${childCount} sub`
+  }
+  return '—'
+}
+
 const lastUpdatedLabel = computed(() => {
   if (!lastUpdated.value) {
     return null
@@ -158,6 +182,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
       <table v-else class="ic-sitrep-table__grid">
         <colgroup>
           <col class="ic-sitrep-table__col-id">
+          <col class="ic-sitrep-table__col-group">
           <col class="ic-sitrep-table__col-priority">
           <col class="ic-sitrep-table__col-dept">
           <col class="ic-sitrep-table__col-type">
@@ -173,6 +198,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
         <thead>
           <tr>
             <th scope="col">ID</th>
+            <th scope="col">Hoofd</th>
             <th scope="col">Prioriteit</th>
             <th scope="col">Afdeling</th>
             <th scope="col">Type</th>
@@ -199,6 +225,9 @@ async function handleStatusSave(payload: IncidentUpdate) {
           >
             <td class="ic-sitrep-table__id">
               {{ incident.incidentId }}
+            </td>
+            <td class="ic-sitrep-table__group">
+              {{ groupingLabel(incident) }}
             </td>
             <td>
               <span class="ic-sitrep-table__priority">
@@ -327,7 +356,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
 
 .ic-sitrep-table__grid {
   width: 100%;
-  min-width: 72rem;
+  min-width: 80rem;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 0.8125rem;
@@ -342,6 +371,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
 }
 
 .ic-sitrep-table__col-id { width: 7.5rem; }
+.ic-sitrep-table__col-group { width: 7.5rem; }
 .ic-sitrep-table__col-priority { width: 6.5rem; }
 .ic-sitrep-table__col-dept { width: 7rem; }
 .ic-sitrep-table__col-type { width: 11rem; }
@@ -445,6 +475,12 @@ async function handleStatusSave(payload: IncidentUpdate) {
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.ic-sitrep-table__group {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: #475569;
 }
 
 .ic-sitrep-table__priority {

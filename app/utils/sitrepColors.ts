@@ -16,6 +16,23 @@ export function getIncidentSeverity(incident: Incident): SitrepSeverity {
   return PRIORITY_SEVERITY[incident.priority] ?? 'ok'
 }
 
+const SEVERITY_RANK: Record<SitrepSeverity, number> = {
+  critical: 0,
+  high: 1,
+  warning: 2,
+  ok: 3,
+  closed: 4,
+}
+
+export function getHighestSeverity(severities: SitrepSeverity[]): SitrepSeverity {
+  if (severities.length === 0) {
+    return 'ok'
+  }
+  return severities.reduce((highest, current) =>
+    SEVERITY_RANK[current] < SEVERITY_RANK[highest] ? current : highest,
+  )
+}
+
 export function severityLabel(severity: SitrepSeverity): string {
   switch (severity) {
     case 'critical':
