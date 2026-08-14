@@ -114,6 +114,20 @@ function toDatetimeLocalValue(value: string): string {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
 }
 
+/** Convert datetime-local input (local wall time) back to UTC ISO for storage. */
+function fromDatetimeLocalValue(value: string): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toISOString()
+}
+
 export function incidentToEditForm(
   incident: Incident,
   config: IncidentConfig | null = null,
@@ -158,7 +172,7 @@ export function editFormToIncidentUpdate(
   return {
     incidentId,
     status: form.status,
-    timestamp: form.timestamp || undefined,
+    timestamp: fromDatetimeLocalValue(form.timestamp),
     department: form.department,
     locationId: form.locationId,
     sectorRow: parsedSector?.row ?? '',
@@ -176,7 +190,7 @@ export function editFormToIncidentUpdate(
     flagVeiligheid: form.flagVeiligheid,
     actionOwner: form.actionOwner.trim(),
     scenario: form.scenario.trim(),
-    deadline: form.deadline || undefined,
+    deadline: fromDatetimeLocalValue(form.deadline),
     closedBy: form.closedBy.trim() || undefined,
     closureResult: form.closureResult.trim() || undefined,
   }
