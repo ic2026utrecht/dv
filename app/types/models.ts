@@ -184,6 +184,12 @@ export interface IncidentUpdateEntry {
   hasPayloadChanges: boolean
 }
 
+export interface IncidentFeedRead {
+  staffId: string
+  incidentId: string
+  lastReadAt: string
+}
+
 export interface ApiResponse<T> {
   data: T
   error?: string

@@ -5,6 +5,7 @@ import { getIncidentSeverity, severityDotClass, severityLabel, severityRowBtnCla
 
 const { incidents, updateIncident } = useSitrep()
 const { filters, filterIncidents } = useSitrepQuery()
+const { unreadCount } = useIncidentFeedUnread()
 
 const filtersDrawerOpen = ref(false)
 
@@ -76,6 +77,10 @@ function formatTime(timestamp: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function unreadBadgeLabel(count: number): string {
+  return count > 99 ? '99+' : String(count)
 }
 
 function openIncident(incident: Incident) {
@@ -198,6 +203,13 @@ async function handleStatusSave(payload: IncidentUpdate) {
           :key="incident.incidentId"
         >
           <div :class="['ic-sitrep-list__row', severityRowBtnClass(getIncidentSeverity(incident))]">
+            <span
+              v-if="unreadCount(incident.incidentId) > 0"
+              class="ic-sitrep-list__unread-badge"
+              :aria-label="`${unreadCount(incident.incidentId)} ongelezen updates`"
+            >
+              {{ unreadBadgeLabel(unreadCount(incident.incidentId)) }}
+            </span>
             <button
               type="button"
               class="ic-sitrep-list__open"
@@ -383,6 +395,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
 }
 
 .ic-sitrep-list__row {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 0.375rem;
@@ -416,6 +429,26 @@ async function handleStatusSave(payload: IncidentUpdate) {
 .ic-sitrep-list__open:focus-visible {
   outline: 2px solid var(--ic-brand);
   outline-offset: 2px;
+}
+
+.ic-sitrep-list__unread-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 9999px;
+  background: var(--ic-orange);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .ic-sitrep-list__status-btn {

@@ -33,3 +33,5 @@ export interface IncidentStatusHistoryResponse {
 export interface IncidentUpdateHistoryResponse {
   data: IncidentUpdateEntry[]
 }
+
+export type IncidentFeedUnreadCounts = Record<string, number>

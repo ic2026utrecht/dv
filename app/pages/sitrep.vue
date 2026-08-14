@@ -19,6 +19,8 @@ const {
   stopPolling,
 } = useSitrep()
 
+const { loadUnreadCounts } = useIncidentFeedUnread()
+
 const { fetchConfig } = useIncidents()
 const apiConfig = ref<Awaited<ReturnType<typeof fetchConfig>> | null>(null)
 const canUpdateIncidents = computed(() => supportsIncidentUpdate(apiConfig.value))
@@ -35,6 +37,10 @@ onMounted(() => {
   fetchIncidents().catch(() => {})
   startPolling()
 })
+
+watch(lastUpdated, () => {
+  loadUnreadCounts().catch(() => {})
+}, { immediate: true })
 
 async function refresh() {
   try {

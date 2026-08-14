@@ -14,6 +14,7 @@ const emit = defineEmits<{
 const { $api } = useNuxtApp()
 const { updateIncident, refreshIncidents } = useSitrep()
 const { displayName, fetchMe } = useStaffAuth()
+const { markRead } = useIncidentFeedUnread()
 
 const entries = ref<IncidentUpdateEntry[]>([])
 const loading = ref(false)
@@ -96,15 +97,20 @@ function messageText(entry: IncidentUpdateEntry, index: number): string | null {
   if (entry.previousStatus && entry.status !== entry.previousStatus) {
     return null
   }
-  if (entry.hasPayloadChanges) {
-    return 'Gegevens bijgewerkt'
-  }
   return null
 }
 
 function statusChanged(entry: IncidentUpdateEntry): boolean {
   return Boolean(entry.previousStatus && entry.status !== entry.previousStatus)
 }
+
+function isVisibleInFeed(entry: IncidentUpdateEntry, index: number): boolean {
+  return statusChanged(entry) || messageText(entry, index) !== null
+}
+
+const visibleEntryCount = computed(() =>
+  entries.value.filter((entry, index) => isVisibleInFeed(entry, index)).length,
+)
 
 function entryIndex(entry: IncidentUpdateEntry): number {
   return entries.value.findIndex(item => item.id === entry.id)
@@ -158,6 +164,10 @@ const feedItems = computed<FeedItem[]>(() => {
   let lastDateKey = ''
 
   entries.value.forEach((entry, index) => {
+    if (!isVisibleInFeed(entry, index)) {
+      return
+    }
+
     const dateKey = entry.createdAt.slice(0, 10)
     if (dateKey !== lastDateKey) {
       items.push({
@@ -246,6 +256,7 @@ async function submitNote() {
     note.value = ''
     emit('noteAdded')
     await loadHistory()
+    await markRead(props.incident.incidentId).catch(() => {})
   }
   catch (err: unknown) {
     error.value = err instanceof Error ? err.message : 'Notitie opslaan mislukt'
@@ -286,7 +297,7 @@ watch(displayName, (name) => {
         Updates
       </h3>
       <span v-if="incident" class="ic-update-feed__count">
-        {{ entries.length }}
+        {{ visibleEntryCount }}
       </span>
     </header>
 

@@ -28,6 +28,7 @@ const emit = defineEmits<{
 
 const { fetchConfig, config, loading: configLoading } = useIncidents()
 const { displayName, fetchMe } = useStaffAuth()
+const { markRead } = useIncidentFeedUnread()
 
 const form = reactive<IncidentEditForm>({
   timestamp: '',
@@ -110,6 +111,20 @@ const updatesRefreshKey = ref(0)
 type EditDialogTab = 'form' | 'updates'
 const editTab = ref<EditDialogTab>('form')
 
+const DESKTOP_FEED_MQ = '(min-width: 961px)'
+
+function isDesktopFeedLayout(): boolean {
+  return import.meta.client && window.matchMedia(DESKTOP_FEED_MQ).matches
+}
+
+function markIncidentFeedRead() {
+  const incidentId = props.incident?.incidentId
+  if (!visible.value || !incidentId) {
+    return
+  }
+  markRead(incidentId).catch(() => {})
+}
+
 watch(visible, (open) => {
   if (open) {
     editTab.value = 'form'
@@ -117,7 +132,17 @@ watch(visible, (open) => {
     if (!config.value) {
       fetchConfig().catch(() => {})
     }
+    if (isDesktopFeedLayout()) {
+      markIncidentFeedRead()
+    }
   }
+})
+
+watch(editTab, (tab) => {
+  if (tab !== 'updates') {
+    return
+  }
+  markIncidentFeedRead()
 })
 
 function handleFeedChanged() {

@@ -6,6 +6,7 @@ import type {
   UpdateIncidentResponse,
   IncidentStatusHistoryResponse,
   IncidentUpdateHistoryResponse,
+  IncidentFeedUnreadCounts,
 } from '~/types/api'
 import type {
   Department,
@@ -478,4 +479,48 @@ export async function deleteSupabaseIncidentUpdate(
   if (!data?.length) {
     throw new Error('Update niet gevonden of geen rechten om te verwijderen')
   }
+}
+
+interface IncidentFeedUnreadCountRow {
+  incident_id: string
+  unread_count: number | string
+}
+
+export async function fetchSupabaseIncidentFeedUnreadCounts(
+  client: SupabaseClient,
+): Promise<IncidentFeedUnreadCounts> {
+  const { data, error } = await client.rpc('get_incident_feed_unread_counts')
+
+  if (error) throw new Error(error.message)
+
+  const counts: IncidentFeedUnreadCounts = {}
+  for (const row of (data ?? []) as IncidentFeedUnreadCountRow[]) {
+    const incidentId = String(row.incident_id ?? '').trim()
+    if (!incidentId) {
+      continue
+    }
+    counts[incidentId] = Number(row.unread_count) || 0
+  }
+  return counts
+}
+
+export async function markSupabaseIncidentFeedRead(
+  client: SupabaseClient,
+  incidentId: string,
+  readAt?: string,
+): Promise<void> {
+  const trimmedId = incidentId.trim()
+  if (!trimmedId) {
+    throw new Error('incidentId verplicht')
+  }
+
+  const params: { p_incident_id: string, p_read_at?: string } = {
+    p_incident_id: trimmedId,
+  }
+  if (readAt) {
+    params.p_read_at = readAt
+  }
+
+  const { error } = await client.rpc('mark_incident_feed_read', params)
+  if (error) throw new Error(error.message)
 }

@@ -14,9 +14,11 @@ import {
   fetchSupabaseIncidents,
   fetchSupabaseIncidentStatusHistory,
   fetchSupabaseIncidentUpdates,
+  fetchSupabaseIncidentFeedUnreadCounts,
   postSupabaseIncident,
   postSupabaseIncidentUpdate,
   deleteSupabaseIncidentUpdate,
+  markSupabaseIncidentFeedRead,
 } from '~/utils/supabaseApi'
 
 class IncidentsModule {
@@ -68,6 +70,16 @@ class IncidentsModule {
   async deleteUpdate(updateId: string): Promise<void> {
     this.assertConfigured()
     await deleteSupabaseIncidentUpdate(this.client, updateId)
+  }
+
+  async getFeedUnreadCounts(): Promise<Record<string, number>> {
+    this.assertConfigured()
+    return await fetchSupabaseIncidentFeedUnreadCounts(this.client)
+  }
+
+  async markFeedRead(incidentId: string, readAt?: string): Promise<void> {
+    this.assertConfigured()
+    await markSupabaseIncidentFeedRead(this.client, incidentId, readAt)
   }
 }
 
