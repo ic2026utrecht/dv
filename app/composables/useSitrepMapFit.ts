@@ -11,6 +11,7 @@ export function useSitrepMapFit(
 ) {
   const fitScale = ref(1)
   const contentSize = ref<{ width: number, height: number } | null>(null)
+  const initialFitApplied = ref(false)
 
   /**
    * Stage is sized to the image's natural pixels so CSS zoom scales a high-res
@@ -54,6 +55,12 @@ export function useSitrepMapFit(
     }))
 
     pinchZoom.setMinScale(nextFit)
+
+    if (!initialFitApplied.value) {
+      pinchZoom.resetToFit(nextFit)
+      initialFitApplied.value = true
+      return
+    }
 
     const isAtDefaultZoom = Math.abs(pinchZoom.scale.value - fitScale.value) < 0.01
       || pinchZoom.scale.value < nextFit
