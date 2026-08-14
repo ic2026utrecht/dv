@@ -3,6 +3,13 @@ import type { SitrepView } from '~/utils/sitrepFilters'
 
 const { incidents } = useSitrep()
 const { view, setView, filterIncidents } = useSitrepQuery()
+const {
+  editDialogOpen,
+  selectedIncident,
+  saving,
+  saveError,
+  handleSave,
+} = useSitrepEditIncident()
 
 const activeTab = computed({
   get: () => view.value,
@@ -106,6 +113,21 @@ const mapIncidentCount = computed(() =>
         </TabPanel>
       </TabPanels>
     </Tabs>
+
+    <Message
+      v-if="saveError"
+      severity="error"
+      class="ic-sitrep-edit-error"
+    >
+      {{ saveError }}
+    </Message>
+
+    <SitrepIncidentEditDialog
+      v-model="editDialogOpen"
+      :incident="selectedIncident"
+      :saving="saving"
+      @save="handleSave"
+    />
   </div>
 </template>
 
@@ -117,6 +139,11 @@ const mapIncidentCount = computed(() =>
   min-width: 0;
   height: 100%;
   overflow: hidden;
+}
+
+.ic-sitrep-edit-error {
+  flex-shrink: 0;
+  margin: 0 1rem 0.75rem;
 }
 
 .ic-sitrep-tabs {

@@ -9,16 +9,13 @@ const EXPANDED_STORAGE_KEY = 'sitrep-group-expanded'
 const { incidents, updateIncident } = useSitrep()
 const { filters, filterIncidents } = useSitrepQuery()
 const { unreadCount } = useIncidentFeedUnread()
+const { openEditIncident } = useSitrepEditIncident()
 
 const filtersDrawerOpen = ref(false)
 
-const selectedIncident = ref<Incident | null>(null)
 const statusIncident = ref<Incident | null>(null)
-const editDialogOpen = ref(false)
 const statusDialogOpen = ref(false)
-const saving = ref(false)
 const statusSaving = ref(false)
-const saveError = ref<string | null>(null)
 const statusSaveError = ref<string | null>(null)
 
 const expandedOverrides = ref<Record<string, boolean>>(loadExpandedOverrides())
@@ -55,13 +52,13 @@ const activeFilterCount = computed(() => {
 watch(
   () => incidents.value,
   (list) => {
-    const id = selectedIncident.value?.incidentId
+    const id = statusIncident.value?.incidentId
     if (!id) {
       return
     }
     const fresh = list.find(incident => incident.incidentId === id)
     if (fresh) {
-      selectedIncident.value = fresh
+      statusIncident.value = fresh
     }
   },
 )
@@ -124,32 +121,13 @@ function groupSeverity(group: IncidentGroup) {
 }
 
 function openIncident(incident: Incident) {
-  selectedIncident.value = incident
-  saveError.value = null
-  editDialogOpen.value = true
+  openEditIncident(incident)
 }
 
 function openStatusUpdate(incident: Incident) {
   statusIncident.value = incident
   statusSaveError.value = null
   statusDialogOpen.value = true
-}
-
-async function handleSave(payload: IncidentUpdate) {
-  saving.value = true
-  saveError.value = null
-
-  try {
-    await updateIncident(payload)
-    editDialogOpen.value = false
-    selectedIncident.value = null
-  }
-  catch (err: unknown) {
-    saveError.value = err instanceof Error ? err.message : 'Opslaan mislukt'
-  }
-  finally {
-    saving.value = false
-  }
 }
 
 async function handleStatusSave(payload: IncidentUpdate) {
@@ -275,16 +253,9 @@ async function handleStatusSave(payload: IncidentUpdate) {
       </ul>
     </div>
 
-    <Message v-if="saveError || statusSaveError" severity="error" class="ic-sitrep-list__error">
-      {{ saveError || statusSaveError }}
+    <Message v-if="statusSaveError" severity="error" class="ic-sitrep-list__error">
+      {{ statusSaveError }}
     </Message>
-
-    <SitrepIncidentEditDialog
-      v-model="editDialogOpen"
-      :incident="selectedIncident"
-      :saving="saving"
-      @save="handleSave"
-    />
 
     <SitrepIncidentStatusDialog
       v-model="statusDialogOpen"

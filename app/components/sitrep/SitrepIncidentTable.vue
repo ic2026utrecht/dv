@@ -4,14 +4,11 @@ import { getIncidentSeverity, severityDotClass, severityLabel } from '~/utils/si
 
 const { incidents, updateIncident, lastUpdated, refreshing } = useSitrep()
 const { filterIncidents } = useSitrepQuery()
+const { openEditIncident } = useSitrepEditIncident()
 
-const selectedIncident = ref<Incident | null>(null)
 const statusIncident = ref<Incident | null>(null)
-const editDialogOpen = ref(false)
 const statusDialogOpen = ref(false)
-const saving = ref(false)
 const statusSaving = ref(false)
-const saveError = ref<string | null>(null)
 const statusSaveError = ref<string | null>(null)
 
 const filteredIncidents = computed(() => filterIncidents(incidents.value))
@@ -54,13 +51,13 @@ const lastUpdatedLabel = computed(() => {
 watch(
   () => incidents.value,
   (list) => {
-    const id = selectedIncident.value?.incidentId
+    const id = statusIncident.value?.incidentId
     if (!id) {
       return
     }
     const fresh = list.find(incident => incident.incidentId === id)
     if (fresh) {
-      selectedIncident.value = fresh
+      statusIncident.value = fresh
     }
   },
 )
@@ -88,9 +85,7 @@ function formatTime(timestamp: string): string {
 }
 
 function openIncident(incident: Incident) {
-  selectedIncident.value = incident
-  saveError.value = null
-  editDialogOpen.value = true
+  openEditIncident(incident)
 }
 
 function openStatusUpdate(incident: Incident, event: Event) {
@@ -114,23 +109,6 @@ function statusButtonLabel(status: string): string {
       return 'Status: Afgesloten — klik om bij te werken'
     default:
       return 'Status wijzigen'
-  }
-}
-
-async function handleSave(payload: IncidentUpdate) {
-  saving.value = true
-  saveError.value = null
-
-  try {
-    await updateIncident(payload)
-    editDialogOpen.value = false
-    selectedIncident.value = null
-  }
-  catch (err: unknown) {
-    saveError.value = err instanceof Error ? err.message : 'Opslaan mislukt'
-  }
-  finally {
-    saving.value = false
   }
 }
 
@@ -270,19 +248,12 @@ async function handleStatusSave(payload: IncidentUpdate) {
     </div>
 
     <Message
-      v-if="saveError || statusSaveError"
+      v-if="statusSaveError"
       severity="error"
       class="ic-sitrep-table__error"
     >
-      {{ saveError || statusSaveError }}
+      {{ statusSaveError }}
     </Message>
-
-    <SitrepIncidentEditDialog
-      v-model="editDialogOpen"
-      :incident="selectedIncident"
-      :saving="saving"
-      @save="handleSave"
-    />
 
     <SitrepIncidentStatusDialog
       v-model="statusDialogOpen"

@@ -120,6 +120,13 @@ export function parseSitrepViewFromQuery(
   return 'map'
 }
 
+export function parseSitrepEditIncidentFromQuery(
+  query: Record<string, string | string[] | null | undefined>,
+): string | null {
+  const value = queryValue(query.incident)?.trim()
+  return value || null
+}
+
 export function buildSitrepQuery(
   filters: SitrepListFilters,
   view: SitrepView,
