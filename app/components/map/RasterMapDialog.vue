@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import type { SelectOption } from '~/types/models'
 import rasterMap from '~/assets/images/raster-map.png'
 import { buildRasterMapCells, getSectorCodesBounds, pickSectorAtClientPoint, RASTER_MAP_GRID_BOUNDS } from '~/constants/rasterMapGrid'
 
 const visible = defineModel<boolean>({ default: false })
+const locationId = defineModel<string | null>('locationId', { default: null })
 
 const props = defineProps<{
   selectedSector?: string | null
   /** null/undefined = all sectors allowed; string[] = only these codes */
   allowedSectors?: string[] | null
+  locationOptions?: SelectOption[]
 }>()
 
 const emit = defineEmits<{
@@ -102,6 +105,9 @@ watch(visible, (open) => {
 watch(
   () => props.allowedSectors,
   () => {
+    if (pendingSector.value && !isAllowed(pendingSector.value)) {
+      pendingSector.value = null
+    }
     if (visible.value) {
       focusAllowedRegion()
     }
@@ -193,9 +199,23 @@ function handlePointerUp(event: PointerEvent) {
     </button>
 
     <div class="ic-raster-dialog__toolbar">
-      <p class="ic-raster-dialog__title">
-        Rasterkaart · {{ allowedSet ? 'locatiegebied' : 'A–M × 1–22' }}
-      </p>
+      <Select
+        v-if="locationOptions?.length"
+        id="raster-map-location"
+        v-model="locationId"
+        :options="locationOptions"
+        option-label="label"
+        option-value="value"
+        placeholder="Selecteer locatie…"
+        filter
+        auto-filter-focus
+        show-clear
+        append-to="body"
+        fluid
+        class="ic-raster-dialog__location-select"
+        aria-label="Locatie"
+      />
+
       <p class="ic-raster-dialog__hint">
         {{ allowedSet
           ? 'Ingezoomd op toegestane sectoren · tik om te markeren'
@@ -316,10 +336,43 @@ function handlePointerUp(event: PointerEvent) {
 
 .ic-raster-dialog__toolbar {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 0.875rem 4rem 0.75rem 1rem;
   border-bottom: 1px solid rgb(255 255 255 / 0.12);
   background: linear-gradient(135deg, var(--ic-brand-dark) 0%, var(--ic-brand) 100%);
   color: #fff;
+}
+
+.ic-raster-dialog__location-select.p-select {
+  width: 100%;
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 0.5rem;
+}
+
+.ic-raster-dialog__location-select.p-select:not(.p-disabled):hover {
+  border-color: rgb(255 255 255 / 0.45);
+}
+
+.ic-raster-dialog__location-select.p-select.p-focus,
+.ic-raster-dialog__location-select.p-inputwrapper-focus.p-select {
+  border-color: var(--ic-accent);
+  box-shadow: 0 0 0 2px rgb(230 151 50 / 0.25);
+}
+
+.ic-raster-dialog__location-select .p-select-label {
+  padding: 0.625rem 0.875rem;
+  color: #fff;
+}
+
+.ic-raster-dialog__location-select .p-select-label.p-placeholder {
+  color: rgb(255 255 255 / 0.55);
+}
+
+.ic-raster-dialog__location-select .p-select-dropdown-icon {
+  color: rgb(255 255 255 / 0.75);
 }
 
 .ic-raster-dialog__title {

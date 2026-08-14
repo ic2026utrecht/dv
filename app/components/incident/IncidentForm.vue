@@ -342,6 +342,8 @@ async function onSubmit() {
 
             <RasterMapDialog
               v-model="rasterMapOpen"
+              v-model:location-id="locationId"
+              :location-options="locationSelectOptions"
               :selected-sector="sectorCode"
               :allowed-sectors="allowedSectors"
               @select="sectorCode = $event"
