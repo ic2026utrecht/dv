@@ -118,13 +118,16 @@ watch(department, () => {
   ambulanceCalled.value = null
 })
 
-watch(locationId, () => {
-  if (!sectorCode.value) {
-    return
+watch(locationId, (newId) => {
+  if (sectorCode.value) {
+    const allowed = allowedSectors.value
+    if (allowed && !allowed.includes(sectorCode.value.toUpperCase())) {
+      sectorCode.value = null
+    }
   }
-  const allowed = allowedSectors.value
-  if (allowed && !allowed.includes(sectorCode.value.toUpperCase())) {
-    sectorCode.value = null
+
+  if (newId && allowedSectors.value) {
+    rasterMapOpen.value = true
   }
 })
 
