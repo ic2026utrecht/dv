@@ -136,6 +136,7 @@ function statusButtonLabel(status: string): string {
         <div class="ic-sitrep-list__meta">
           <span>{{ formatTime(incident.timestamp) }}</span>
           <span v-if="incident.isOpen">{{ formatAge(incident.ageMinutes) }} open</span>
+          <span v-if="incident.reporter">Melder: {{ incident.reporter }}</span>
           <span v-if="incident.actionOwner">Actie: {{ incident.actionOwner }}</span>
           <span>{{ incident.status || 'Open' }}</span>
         </div>

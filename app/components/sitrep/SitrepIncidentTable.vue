@@ -192,6 +192,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
           <col class="ic-sitrep-table__col-time">
           <col class="ic-sitrep-table__col-open">
           <col class="ic-sitrep-table__col-owner">
+          <col class="ic-sitrep-table__col-reporter">
           <col class="ic-sitrep-table__col-desc">
           <col class="ic-sitrep-table__col-actions">
         </colgroup>
@@ -208,6 +209,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
             <th scope="col">Tijd</th>
             <th scope="col">Open</th>
             <th scope="col">Actiehouder</th>
+            <th scope="col">Melder</th>
             <th scope="col">Omschrijving</th>
             <th scope="col" class="ic-sitrep-table__actions-head" aria-label="Acties" />
           </tr>
@@ -247,6 +249,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
               {{ incident.isOpen ? formatAge(incident.ageMinutes) : '—' }}
             </td>
             <td>{{ incident.actionOwner || '—' }}</td>
+            <td>{{ incident.reporter || '—' }}</td>
             <td class="ic-sitrep-table__desc">
               {{ incident.description || '—' }}
             </td>
@@ -381,6 +384,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
 .ic-sitrep-table__col-time { width: 6.5rem; }
 .ic-sitrep-table__col-open { width: 5rem; }
 .ic-sitrep-table__col-owner { width: 7rem; }
+.ic-sitrep-table__col-reporter { width: 7rem; }
 .ic-sitrep-table__col-desc { width: auto; }
 .ic-sitrep-table__col-actions { width: 2.75rem; }
 
