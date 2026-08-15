@@ -355,53 +355,20 @@ function submit() {
 
         <section class="ic-sitrep-edit-dialog__section">
           <h3 class="ic-sitrep-edit-dialog__heading">
-            Groepering
-          </h3>
-
-          <IcFormField
-            label="Hoofdincident"
-            html-for="sitrep-edit-parent"
-            :hint="parentSelectDisabled
-              ? 'Dit incident heeft sub-incidenten en kan niet onder een ander incident worden geplaatst.'
-              : 'Koppel dit incident als sub aan een bestaand hoofdincident.'"
-          >
-            <Select
-              id="sitrep-edit-parent"
-              v-model="form.parentId"
-              :options="parentSelectOptions"
-              option-label="label"
-              option-value="value"
-              :disabled="parentSelectDisabled"
-              filter
-              show-clear
-              placeholder="Hoofdincident (geen groep)"
-              class="ic-field w-full"
-            />
-          </IcFormField>
-
-          <div v-if="hasLinkedChildren" class="ic-sitrep-edit-dialog__children">
-            <p class="ic-sitrep-edit-dialog__children-label">
-              Sub-incidenten
-            </p>
-            <ul class="ic-sitrep-edit-dialog__children-list">
-              <li
-                v-for="child in linkedChildren"
-                :key="child.incidentId"
-              >
-                <span class="ic-sitrep-edit-dialog__children-id">{{ child.incidentId }}</span>
-                <span>{{ child.incidentTypeName }}</span>
-                <span class="ic-sitrep-edit-dialog__children-status">{{ child.status || 'Open' }}</span>
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="ic-sitrep-edit-dialog__section">
-          <h3 class="ic-sitrep-edit-dialog__heading">
             Melding
           </h3>
 
-          <IcFormField label="Tijdstempel" html-for="sitrep-edit-timestamp">
+          <IcFormField label="Korte omschrijving" html-for="sitrep-edit-description">
+            <Textarea
+              id="sitrep-edit-description"
+              v-model="form.description"
+              class="ic-field w-full"
+              rows="3"
+              auto-resize
+            />
+          </IcFormField>
+
+          <IcFormField label="Tijdstempel" html-for="sitrep-edit-timestamp" class="mt-4">
             <InputText
               id="sitrep-edit-timestamp"
               v-model="form.timestamp"
@@ -486,16 +453,6 @@ function submit() {
               v-model="form.priority"
               :options="priorityOptions"
               variant="priority"
-            />
-          </IcFormField>
-
-          <IcFormField label="Korte omschrijving" html-for="sitrep-edit-description" class="mt-4">
-            <Textarea
-              id="sitrep-edit-description"
-              v-model="form.description"
-              class="ic-field w-full"
-              rows="3"
-              auto-resize
             />
           </IcFormField>
         </section>
@@ -583,6 +540,49 @@ function submit() {
           v-model:closure-result="form.closureResult"
           id-prefix="sitrep-edit"
         />
+
+        <section class="ic-sitrep-edit-dialog__section">
+          <h3 class="ic-sitrep-edit-dialog__heading">
+            Groepering
+          </h3>
+
+          <IcFormField
+            label="Hoofdincident"
+            html-for="sitrep-edit-parent"
+            :hint="parentSelectDisabled
+              ? 'Dit incident heeft sub-incidenten en kan niet onder een ander incident worden geplaatst.'
+              : 'Koppel dit incident als sub aan een bestaand hoofdincident.'"
+          >
+            <Select
+              id="sitrep-edit-parent"
+              v-model="form.parentId"
+              :options="parentSelectOptions"
+              option-label="label"
+              option-value="value"
+              :disabled="parentSelectDisabled"
+              filter
+              show-clear
+              placeholder="Hoofdincident (geen groep)"
+              class="ic-field w-full"
+            />
+          </IcFormField>
+
+          <div v-if="hasLinkedChildren" class="ic-sitrep-edit-dialog__children">
+            <p class="ic-sitrep-edit-dialog__children-label">
+              Sub-incidenten
+            </p>
+            <ul class="ic-sitrep-edit-dialog__children-list">
+              <li
+                v-for="child in linkedChildren"
+                :key="child.incidentId"
+              >
+                <span class="ic-sitrep-edit-dialog__children-id">{{ child.incidentId }}</span>
+                <span>{{ child.incidentTypeName }}</span>
+                <span class="ic-sitrep-edit-dialog__children-status">{{ child.status || 'Open' }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
 
               </div>
             </TabPanel>
