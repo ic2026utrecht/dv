@@ -54,6 +54,7 @@ function sortByTimestampDesc(a: Incident, b: Incident): number {
 export const useSitrepIncidentsStore = defineStore('sitrepIncidents', {
   state: () => ({
     incidents: [] as Incident[],
+    updateNotesByIncidentId: {} as Record<string, string>,
     fetching: false,
     manualRefresh: false,
     error: null as string | null,
@@ -89,8 +90,14 @@ export const useSitrepIncidentsStore = defineStore('sitrepIncidents', {
 
       try {
         const { $api } = useNuxtApp()
-        const response = await $api.incidents.list()
+        const [response, notesIndex] = await Promise.all([
+          $api.incidents.list(),
+          $api.incidents.getUpdateNotesIndex().catch(() => null),
+        ])
         this.incidents = response.data ?? []
+        if (notesIndex) {
+          this.updateNotesByIncidentId = notesIndex
+        }
         this.lastUpdated = Date.now()
         this.error = null
       }
@@ -136,6 +143,7 @@ export const useSitrepIncidentsStore = defineStore('sitrepIncidents', {
 
     clear() {
       this.incidents = []
+      this.updateNotesByIncidentId = {}
       this.fetching = false
       this.manualRefresh = false
       this.error = null

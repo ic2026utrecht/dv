@@ -420,6 +420,29 @@ export async function fetchSupabaseIncidentUpdates(
   }
 }
 
+/** Aggregated update notes per incident for sitrep full-text search. */
+export async function fetchSupabaseIncidentUpdateNotesIndex(
+  client: SupabaseClient,
+): Promise<Record<string, string>> {
+  const { data, error } = await client
+    .from('incident_updates')
+    .select('incident_id, notes')
+    .neq('notes', '')
+
+  if (error) throw new Error(error.message)
+
+  const index: Record<string, string> = {}
+  for (const row of data ?? []) {
+    const incidentId = String(row.incident_id ?? '').trim()
+    const note = String(row.notes ?? '').trim()
+    if (!incidentId || !note) {
+      continue
+    }
+    index[incidentId] = index[incidentId] ? `${index[incidentId]} ${note}` : note
+  }
+  return index
+}
+
 export async function postSupabaseIncidentUpdate(
   client: SupabaseClient,
   payload: IncidentUpdate,

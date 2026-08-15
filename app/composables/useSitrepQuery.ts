@@ -14,6 +14,7 @@ export const useSitrepQuery = () => {
   const route = useRoute()
   const router = useRouter()
   const { config } = useIncidents()
+  const sitrepStore = useSitrepIncidentsStore()
 
   const filters = computed(() => parseSitrepFiltersFromQuery(route.query))
   const view = computed(() => parseSitrepViewFromQuery(route.query))
@@ -52,7 +53,12 @@ export const useSitrepQuery = () => {
   }
 
   function filterIncidents(incidents: Incident[]) {
-    return filterAndSortIncidents(incidents, filters.value, locationNamesById.value)
+    return filterAndSortIncidents(
+      incidents,
+      filters.value,
+      locationNamesById.value,
+      sitrepStore.updateNotesByIncidentId,
+    )
   }
 
   return {

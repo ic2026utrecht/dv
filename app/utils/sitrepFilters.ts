@@ -11,6 +11,7 @@ export interface SitrepListFilters {
   status: SitrepStatusValue[]
   location: string[]
   sort: SitrepSortKey
+  search: string
 }
 
 export const DEFAULT_SITREP_LIST_FILTERS: SitrepListFilters = {
@@ -19,6 +20,7 @@ export const DEFAULT_SITREP_LIST_FILTERS: SitrepListFilters = {
   status: ['open'],
   location: [],
   sort: 'priority',
+  search: '',
 }
 
 const STATUS_VALUES: SitrepStatusValue[] = ['open', 'Open', 'In behandeling', 'Afgesloten']
@@ -86,6 +88,10 @@ function parseLocationFilter(query: Record<string, string | string[] | null | un
   return values
 }
 
+function parseSearchFilter(query: Record<string, string | string[] | null | undefined>): string {
+  return queryValue(query.q)?.trim() ?? DEFAULT_SITREP_LIST_FILTERS.search
+}
+
 function isSortKey(value: string): value is SitrepSortKey {
   return (SORT_KEYS as readonly string[]).includes(value)
 }
@@ -101,6 +107,7 @@ export function parseSitrepFiltersFromQuery(
     status: parseStatusFilter(query),
     location: parseLocationFilter(query),
     sort: sort && isSortKey(sort) ? sort : DEFAULT_SITREP_LIST_FILTERS.sort,
+    search: parseSearchFilter(query),
   }
 }
 
@@ -142,6 +149,9 @@ export function buildSitrepQuery(
   if (filters.location.length > 0) {
     query.location = filters.location.join(',')
   }
+  if (filters.search.trim()) {
+    query.q = filters.search.trim()
+  }
   if (!arraysEqual(filters.status, DEFAULT_SITREP_LIST_FILTERS.status)) {
     query.status = filters.status.length > 0 ? filters.status.join(',') : 'all'
   }
@@ -165,6 +175,7 @@ export function stripSitrepQueryKeys(
   delete next.location
   delete next.sort
   delete next.view
+  delete next.q
   return next
 }
 
@@ -216,6 +227,60 @@ function matchesLocation(
   return selectedNames.includes(incident.locationName)
 }
 
+function normalizeSearchText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function buildIncidentSearchBlob(
+  incident: Incident,
+  updateNotes = '',
+): string {
+  return normalizeSearchText([
+    incident.incidentId,
+    incident.description,
+    incident.locationName,
+    incident.zone,
+    incident.sector,
+    incident.sectorLabel,
+    incident.incidentTypeName,
+    incident.department,
+    incident.priority,
+    incident.status,
+    incident.reporter,
+    incident.actionOwner,
+    incident.helpDeployed,
+    incident.updateNotes,
+    incident.freeField,
+    incident.scenario,
+    incident.closedBy,
+    incident.closureResult,
+    incident.parentId,
+    updateNotes,
+  ].filter(Boolean).join(' '))
+}
+
+function matchesSearch(
+  incident: Incident,
+  search: string,
+  updateNotesByIncidentId: Record<string, string> = {},
+): boolean {
+  const query = normalizeSearchText(search)
+  if (!query) {
+    return true
+  }
+
+  const tokens = query.split(' ').filter(Boolean)
+  if (tokens.length === 0) {
+    return true
+  }
+
+  const blob = buildIncidentSearchBlob(
+    incident,
+    updateNotesByIncidentId[incident.incidentId] ?? '',
+  )
+  return tokens.every(token => blob.includes(token))
+}
+
 export function compareIncidents(a: Incident, b: Incident, sort: SitrepSortKey): number {
   switch (sort) {
     case 'newest':
@@ -239,13 +304,15 @@ export function filterAndSortIncidents(
   incidents: Incident[],
   filters: SitrepListFilters,
   locationNamesById: Record<string, string> = {},
+  updateNotesByIncidentId: Record<string, string> = {},
 ): Incident[] {
   return incidents
     .filter(incident =>
       matchesDepartment(incident, filters.department)
       && matchesPriority(incident, filters.priority)
       && matchesStatus(incident, filters.status)
-      && matchesLocation(incident, filters.location, locationNamesById),
+      && matchesLocation(incident, filters.location, locationNamesById)
+      && matchesSearch(incident, filters.search, updateNotesByIncidentId),
     )
     .sort((a, b) => compareIncidents(a, b, filters.sort))
 }

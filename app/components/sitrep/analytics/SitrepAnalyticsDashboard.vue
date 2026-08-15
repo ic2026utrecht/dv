@@ -615,12 +615,6 @@ function chartVisible(id: SitrepAnalyticsChartId) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (min-width: 901px) {
-  .ic-sitrep-analytics__filters :deep(.ic-sitrep-list-filters) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 .ic-sitrep-analytics__settings-btn {
   display: inline-flex;
   align-items: center;

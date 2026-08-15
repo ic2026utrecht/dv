@@ -653,6 +653,12 @@ body {
   background: var(--ic-surface);
 }
 
+@media (min-width: 901px) {
+  .ic-sitrep-list__controls {
+    padding: 1rem 1.125rem;
+  }
+}
+
 .ic-sitrep-list__controls--desktop {
   display: block;
 }
@@ -690,10 +696,30 @@ body {
   font-size: 0.75rem;
 }
 
+.ic-sitrep-list__filter--search {
+  width: 100%;
+}
+
 .ic-sitrep-list__filter :deep(.p-select-label),
 .ic-sitrep-list__filter :deep(.p-multiselect-label) {
   padding: 0.4375rem 0.625rem;
   font-size: 0.75rem;
+}
+
+@media (min-width: 901px) {
+  .ic-sitrep-list__controls .ic-label {
+    font-size: 0.8125rem;
+  }
+
+  .ic-sitrep-list__filter {
+    font-size: 0.9375rem;
+  }
+
+  .ic-sitrep-list__filter :deep(.p-select-label),
+  .ic-sitrep-list__filter :deep(.p-multiselect-label) {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9375rem;
+  }
 }
 
 .ic-sitrep-list__scroll {

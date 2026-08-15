@@ -37,6 +37,9 @@ const activeFilterCount = computed(() => {
   if (filters.value.location.length > 0) {
     count++
   }
+  if (filters.value.search.trim()) {
+    count++
+  }
   if (
     filters.value.status.length !== DEFAULT_SITREP_LIST_FILTERS.status.length
     || filters.value.status.some((value, index) => value !== DEFAULT_SITREP_LIST_FILTERS.status[index])

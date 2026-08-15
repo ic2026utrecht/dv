@@ -14,6 +14,7 @@ import {
   fetchSupabaseIncidents,
   fetchSupabaseIncidentStatusHistory,
   fetchSupabaseIncidentUpdates,
+  fetchSupabaseIncidentUpdateNotesIndex,
   fetchSupabaseIncidentFeedUnreadCounts,
   postSupabaseIncident,
   postSupabaseIncidentUpdate,
@@ -65,6 +66,11 @@ class IncidentsModule {
   async getUpdateHistory(incidentId: string): Promise<IncidentUpdateHistoryResponse> {
     this.assertConfigured()
     return await fetchSupabaseIncidentUpdates(this.client, incidentId)
+  }
+
+  async getUpdateNotesIndex(): Promise<Record<string, string>> {
+    this.assertConfigured()
+    return await fetchSupabaseIncidentUpdateNotesIndex(this.client)
   }
 
   async deleteUpdate(updateId: string): Promise<void> {
