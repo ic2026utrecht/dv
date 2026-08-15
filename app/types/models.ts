@@ -38,6 +38,42 @@ export interface RasterConfig {
   columns: number[]
 }
 
+export interface RasterMapGridBounds {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+export type RasterGeoCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+export type RasterGeoAnchorKey = 'nw' | 'ne' | 'sw' | 'se'
+
+export interface RasterGeoAnchor {
+  sector: string
+  corner: RasterGeoCorner
+  fx: number
+  fy: number
+  lat: number
+  lng: number
+}
+
+export interface RasterMapDefinition {
+  id: string
+  name: string
+  /** Resolved URL for <img> / Leaflet overlay */
+  imageUrl: string
+  /** Raw DB path: asset:… or storage object path */
+  imagePath: string
+  active: boolean
+  isDefault: boolean
+  gridBounds: RasterMapGridBounds
+  rows: string[]
+  columns: number[]
+  geoAnchors: Partial<Record<RasterGeoAnchorKey, RasterGeoAnchor>>
+  sortOrder: number
+  updatedAt?: string
+}
+
 export type IncidentStatus = 'Open' | 'In behandeling' | 'Afgesloten' | string
 
 export interface Incident {
@@ -97,6 +133,8 @@ export interface IncidentConfig {
   incidentTypes: IncidentType[]
   helpOptions: HelpOption[]
   raster: RasterConfig
+  /** Default venue map (grid + optional geo anchors). */
+  rasterMap: RasterMapDefinition
   personsCountOptions: SelectOption[]
   supportedActions?: string[]
   apiVersion?: number

@@ -1,7 +1,7 @@
 import type { IncidentConfig } from '~/types/models'
 
 /** Bump when reference data shape/content changes so clients refetch config. */
-export const INCIDENT_CONFIG_API_VERSION = 5
+export const INCIDENT_CONFIG_API_VERSION = 6
 
 const STORAGE_KEY = 'ic2026-incident-config-v2'
 const LEGACY_STORAGE_KEY = 'ic2026-incident-config'

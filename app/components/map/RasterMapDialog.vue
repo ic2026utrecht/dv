@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SelectOption } from '~/types/models'
-import rasterMap from '~/assets/images/raster-map.png'
+import bundledRasterMap from '~/assets/images/raster-map.png'
+import { createDefaultRasterMapDefinition } from '~/constants/defaultRasterMap'
 import { buildRasterMapCells, getSectorCodesBounds, pickSectorAtClientPoint, RASTER_MAP_GRID_BOUNDS } from '~/constants/rasterMapGrid'
 
 const visible = defineModel<boolean>({ default: false })
@@ -17,7 +18,22 @@ const emit = defineEmits<{
   select: [sectorCode: string]
 }>()
 
-const cells = buildRasterMapCells()
+const { config, fetchConfig } = useIncidents()
+
+onMounted(() => {
+  fetchConfig().catch(() => {})
+})
+
+const rasterMapDef = computed(() =>
+  config.value?.rasterMap ?? createDefaultRasterMapDefinition(bundledRasterMap),
+)
+
+const mapImageSrc = computed(() => rasterMapDef.value.imageUrl || bundledRasterMap)
+const mapBounds = computed(() => rasterMapDef.value.gridBounds ?? RASTER_MAP_GRID_BOUNDS)
+
+const cells = computed(() =>
+  buildRasterMapCells(rasterMapDef.value.rows, rasterMapDef.value.columns, mapBounds.value),
+)
 const allowedSet = computed(() => {
   if (!props.allowedSectors) {
     return null
@@ -56,15 +72,20 @@ function focusAllowedRegion() {
     return
   }
 
-  const region = getSectorCodesBounds(props.allowedSectors)
+  const region = getSectorCodesBounds(
+    props.allowedSectors,
+    rasterMapDef.value.rows,
+    rasterMapDef.value.columns,
+    mapBounds.value,
+  )
   if (!region) {
     resetMapView()
     return
   }
 
   // Only zoom when the area is meaningfully smaller than the full grid.
-  const fullArea = (RASTER_MAP_GRID_BOUNDS.right - RASTER_MAP_GRID_BOUNDS.left)
-    * (RASTER_MAP_GRID_BOUNDS.bottom - RASTER_MAP_GRID_BOUNDS.top)
+  const fullArea = (mapBounds.value.right - mapBounds.value.left)
+    * (mapBounds.value.bottom - mapBounds.value.top)
   const regionArea = (region.right - region.left) * (region.bottom - region.top)
   if (regionArea / fullArea > 0.85) {
     resetMapView()
@@ -77,7 +98,12 @@ function focusAllowedRegion() {
 function focusInitialRegion() {
   const selected = props.selectedSector?.trim()
   if (selected) {
-    const region = getSectorCodesBounds([selected])
+    const region = getSectorCodesBounds(
+      [selected],
+      rasterMapDef.value.rows,
+      rasterMapDef.value.columns,
+      mapBounds.value,
+    )
     if (region) {
       focusOnRegion(region)
       return
@@ -167,7 +193,14 @@ function trySelectAt(clientX: number, clientY: number) {
     return
   }
 
-  const code = pickSectorAtClientPoint(clientX, clientY, stageRef.value)
+  const code = pickSectorAtClientPoint(
+    clientX,
+    clientY,
+    stageRef.value,
+    rasterMapDef.value.rows,
+    rasterMapDef.value.columns,
+    mapBounds.value,
+  )
   if (code) {
     onCellTap(code)
   }
@@ -251,7 +284,7 @@ function handlePointerUp(event: PointerEvent) {
       <div ref="stageRef" class="ic-raster-dialog__stage" :style="[transformStyle, stageSizeStyle]">
         <img
           ref="imageRef"
-          :src="rasterMap"
+          :src="mapImageSrc"
           alt=""
           class="ic-raster-dialog__image"
           decoding="async"

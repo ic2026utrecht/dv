@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import rasterMap from '~/assets/images/raster-map.png'
+import bundledRasterMap from '~/assets/images/raster-map.png'
+import { createDefaultRasterMapDefinition } from '~/constants/defaultRasterMap'
 import { getSectorMarkerPosition } from '~/constants/rasterMapGrid'
 import type { Incident } from '~/types/models'
 import { getIncidentSeverity, severityDotClass, severityMarkerClass, type SitrepSeverity } from '~/utils/sitrepColors'
@@ -11,10 +12,39 @@ const props = defineProps<{
 const { filterIncidents } = useSitrepQuery()
 const { openEditIncident } = useSitrepEditIncident()
 const { hoveredIncidentId } = useSitrepMapHighlight()
+const { config, fetchConfig } = useIncidents()
+
+const MAP_MODE_KEY = 'sitrep-map-mode'
+type MapMode = 'raster' | 'geo'
+const mapMode = ref<MapMode>('raster')
+
+onMounted(() => {
+  fetchConfig().catch(() => {})
+  if (import.meta.client) {
+    const stored = localStorage.getItem(MAP_MODE_KEY)
+    if (stored === 'raster' || stored === 'geo') {
+      mapMode.value = stored
+    }
+  }
+})
+
+watch(mapMode, (mode) => {
+  if (import.meta.client) {
+    localStorage.setItem(MAP_MODE_KEY, mode)
+  }
+})
+
+const rasterMapDef = computed(() =>
+  config.value?.rasterMap ?? createDefaultRasterMapDefinition(bundledRasterMap),
+)
+
+const mapImageSrc = computed(() => rasterMapDef.value.imageUrl || bundledRasterMap)
+
 const hoveredSector = ref<string | null>(null)
 const activePickerSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
+const geoMapRef = ref<{ incidentCountOnMap?: { value: number }, invalidateSize?: () => void } | null>(null)
 
 const pinchZoom = usePinchZoom({ maxScale: 2.5 })
 const {
@@ -56,12 +86,16 @@ const markers = computed(() => {
     severities: SitrepSeverity[]
   }>()
 
+  const bounds = rasterMapDef.value.gridBounds
+  const rows = rasterMapDef.value.rows
+  const columns = rasterMapDef.value.columns
+
   for (const incident of filterIncidents(props.incidents)) {
     if (!incident.sector) {
       continue
     }
 
-    const position = getSectorMarkerPosition(incident.sector)
+    const position = getSectorMarkerPosition(incident.sector, rows, columns, bounds)
     if (!position) {
       continue
     }
@@ -98,9 +132,18 @@ const markers = computed(() => {
   })
 })
 
-const incidentCountOnMap = computed(() =>
-  markers.value.reduce((total, marker) => total + marker.count, 0),
-)
+const incidentCountOnMap = computed(() => {
+  if (mapMode.value === 'geo' && geoMapRef.value) {
+    const exposed = geoMapRef.value.incidentCountOnMap as number | { value: number } | undefined
+    if (typeof exposed === 'number') {
+      return exposed
+    }
+    if (exposed && typeof exposed.value === 'number') {
+      return exposed.value
+    }
+  }
+  return markers.value.reduce((total, marker) => total + marker.count, 0)
+})
 
 const listHoveredIncident = computed(() => {
   const id = hoveredIncidentId.value
@@ -139,17 +182,44 @@ function onPickerSelect(incident: Incident) {
   activePickerSector.value = null
   openEditIncident(incident)
 }
+
+watch(mapMode, (mode) => {
+  if (mode === 'geo') {
+    nextTick(() => geoMapRef.value?.invalidateSize?.())
+  }
+})
 </script>
 
 <template>
   <section class="ic-sitrep-map ic-sitrep-map--panel">
     <header class="ic-sitrep-map__header">
       <div class="ic-sitrep-map__header-main">
-
+        <div
+          class="ic-sitrep-map__mode"
+          role="group"
+          aria-label="Kaartmodus"
+        >
+          <button
+            type="button"
+            class="ic-sitrep-map__mode-btn"
+            :class="{ 'ic-sitrep-map__mode-btn--active': mapMode === 'raster' }"
+            @click="mapMode = 'raster'"
+          >
+            Raster
+          </button>
+          <button
+            type="button"
+            class="ic-sitrep-map__mode-btn"
+            :class="{ 'ic-sitrep-map__mode-btn--active': mapMode === 'geo' }"
+            @click="mapMode = 'geo'"
+          >
+            Kaart
+          </button>
+        </div>
       </div>
       <div class="ic-sitrep-map__header-actions">
         <button
-          v-if="scale > fitScale + 0.01"
+          v-if="mapMode === 'raster' && scale > fitScale + 0.01"
           type="button"
           class="ic-sitrep-map__reset"
           @click="resetMapView"
@@ -178,7 +248,21 @@ function onPickerSelect(incident: Incident) {
     </header>
 
     <div class="ic-sitrep-map__frame">
+      <ClientOnly v-if="mapMode === 'geo'">
+        <SitrepGeoMap
+          ref="geoMapRef"
+          class="ic-sitrep-map__geo"
+          :incidents="incidents"
+          :raster-map="rasterMapDef"
+        />
+        <template #fallback>
+          <div class="ic-sitrep-map__geo-fallback">
+            Kaart laden…
+          </div>
+        </template>
+      </ClientOnly>
       <div
+        v-else
         ref="viewportRef"
         class="ic-sitrep-map__viewport"
         @click="onViewportClick"
@@ -195,13 +279,13 @@ function onPickerSelect(incident: Incident) {
         <div class="ic-sitrep-map__stage" :style="[transformStyle, stageSizeStyle]">
           <img
             ref="imageRef"
-            :src="rasterMap"
+            :src="mapImageSrc"
             alt="Congreslocatie rasterkaart"
             class="ic-sitrep-map__image"
             decoding="async"
             draggable="false"
           >
-          <div class="ic-sitrep-map__markers" :style="markerLayerStyle">
+<div class="ic-sitrep-map__markers" :style="markerLayerStyle">
             <button
               v-for="{ sector, position, incidents, count, severity, highlightedIncident } in markers"
               :key="sector"
@@ -377,6 +461,49 @@ function onPickerSelect(incident: Incident) {
 .ic-sitrep-map__header-main {
   min-width: 0;
 }
+
+.ic-sitrep-map__mode {
+  display: inline-flex;
+  border: 1px solid rgb(135 161 198 / 0.55);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ic-sitrep-map__mode-btn {
+  padding: 0.25rem 0.625rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ic-sitrep-map__mode-btn--active {
+  background: var(--ic-brand);
+  color: #fff;
+}
+
+.ic-sitrep-map__mode-btn:not(.ic-sitrep-map__mode-btn--active):hover {
+  background: rgb(135 161 198 / 0.12);
+}
+
+.ic-sitrep-map__geo,
+.ic-sitrep-map__geo-fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.ic-sitrep-map__geo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
 
 .ic-sitrep-map__header-actions {
   display: flex;

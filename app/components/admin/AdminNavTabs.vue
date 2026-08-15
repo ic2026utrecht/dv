@@ -4,6 +4,7 @@ const route = useRoute()
 const tabs = [
   { to: '/admin/users', label: 'Medewerkers', icon: 'pi-users' },
   { to: '/admin/locations', label: 'Locaties', icon: 'pi-map-marker' },
+  { to: '/admin/maps', label: 'Kaarten', icon: 'pi-map' },
   { to: '/admin/incident-types', label: 'Incidenttypes', icon: 'pi-list' },
 ] as const
 

@@ -24,6 +24,7 @@ import type {
 import { PERSONS_COUNT_OPTIONS } from '~/constants/incident'
 import { INCIDENT_CONFIG_API_VERSION } from '~/utils/incidentConfigCache'
 import { parseSectorRangesJson, RASTER_COLUMNS, RASTER_ROWS } from '~/utils/incidentOptions'
+import { fetchDefaultRasterMap } from '~/utils/rasterMapApi'
 
 export function assertSupabaseConfig(url: string, anonKey: string): void {
   if (!url || !anonKey || anonKey.includes('YOUR_')) {
@@ -265,10 +266,11 @@ function validateSubmission(body: IncidentSubmission): void {
 }
 
 export async function fetchSupabaseConfig(client: SupabaseClient): Promise<ConfigResponse> {
-  const [locationsRes, typesRes, helpRes] = await Promise.all([
+  const [locationsRes, typesRes, helpRes, rasterMap] = await Promise.all([
     client.from('locations').select('*').eq('active', true).order('name'),
     client.from('incident_types').select('*').eq('active', true).order('name'),
     client.from('help_options').select('*').eq('active', true).order('name'),
+    fetchDefaultRasterMap(client),
   ])
 
   if (locationsRes.error) throw new Error(locationsRes.error.message)
@@ -313,9 +315,10 @@ export async function fetchSupabaseConfig(client: SupabaseClient): Promise<Confi
     incidentTypes,
     helpOptions,
     raster: {
-      rows: [...RASTER_ROWS],
-      columns: [...RASTER_COLUMNS],
+      rows: rasterMap.rows.length ? [...rasterMap.rows] : [...RASTER_ROWS],
+      columns: rasterMap.columns.length ? [...rasterMap.columns] : [...RASTER_COLUMNS],
     },
+    rasterMap,
     personsCountOptions: PERSONS_COUNT_OPTIONS,
   }
 

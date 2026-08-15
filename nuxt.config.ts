@@ -34,8 +34,13 @@ export default defineNuxtConfig({
   components: [{ path: '~/components', pathPrefix: false }],
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  css: ['primeicons/primeicons.css', '~/assets/css/main.css'],
+  css: ['primeicons/primeicons.css', '~/assets/css/main.css', 'leaflet/dist/leaflet.css'],
   modules: ['@nuxtjs/tailwindcss', '@primevue/nuxt-module', '@pinia/nuxt', '@nuxtjs/supabase'],
+  vite: {
+    optimizeDeps: {
+      include: ['leaflet', 'leaflet-imageoverlay-rotated', 'leaflet-rotate'],
+    },
+  },
   runtimeConfig: {
     public: {
       supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL ?? '',

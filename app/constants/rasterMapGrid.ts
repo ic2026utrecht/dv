@@ -88,6 +88,53 @@ export function getSectorMarkerPosition(
   }
 }
 
+export type RasterCellCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+/** Image fraction (0–1) for a sector cell corner or center. */
+export function getSectorImageFraction(
+  sectorCode: string,
+  corner: RasterCellCorner | 'center' = 'center',
+  rows: string[] = RASTER_ROWS,
+  columns: number[] = RASTER_COLUMNS,
+  bounds = RASTER_MAP_GRID_BOUNDS,
+): { fx: number, fy: number } | null {
+  const parsed = sectorCode.match(/^([A-M])(\d{1,2})$/i)
+  if (!parsed?.[1] || !parsed[2]) {
+    return null
+  }
+
+  const row = parsed[1].toUpperCase()
+  const column = Number(parsed[2])
+  const rowIndex = rows.indexOf(row)
+  const colIndex = columns.indexOf(column)
+  if (rowIndex < 0 || colIndex < 0) {
+    return null
+  }
+
+  const gridWidth = bounds.right - bounds.left
+  const gridHeight = bounds.bottom - bounds.top
+  const cellWidth = gridWidth / columns.length
+  const cellHeight = gridHeight / rows.length
+
+  let fx = bounds.left + colIndex * cellWidth
+  let fy = bounds.top + rowIndex * cellHeight
+
+  if (corner === 'center') {
+    fx += cellWidth / 2
+    fy += cellHeight / 2
+  }
+  else {
+    if (corner === 'top-right' || corner === 'bottom-right') {
+      fx += cellWidth
+    }
+    if (corner === 'bottom-left' || corner === 'bottom-right') {
+      fy += cellHeight
+    }
+  }
+
+  return { fx, fy }
+}
+
 /** Bounding box of sector codes as fractions of image width/height. */
 export function getSectorCodesBounds(
   codes: string[],

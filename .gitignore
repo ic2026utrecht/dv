@@ -8,3 +8,6 @@ dist
 !.env.example
 *.log
 .DS_Store
+
+# Full DB backups contain staff PII — keep local
+backups/full-*/
