@@ -2,14 +2,16 @@
 import rasterMap from '~/assets/images/raster-map.png'
 import { getSectorMarkerPosition } from '~/constants/rasterMapGrid'
 import type { Incident } from '~/types/models'
-import { getIncidentSeverity, severityMarkerClass, type SitrepSeverity } from '~/utils/sitrepColors'
+import { getIncidentSeverity, severityDotClass, severityMarkerClass, type SitrepSeverity } from '~/utils/sitrepColors'
 
 const props = defineProps<{
   incidents: Incident[]
 }>()
 
 const { filterIncidents } = useSitrepQuery()
+const { openEditIncident } = useSitrepEditIncident()
 const hoveredSector = ref<string | null>(null)
+const activePickerSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
 
@@ -102,6 +104,25 @@ function formatTime(timestamp: string): string {
     minute: '2-digit',
   })
 }
+
+function onViewportClick() {
+  activePickerSector.value = null
+}
+
+function onMarkerClick(sector: string, incidents: Incident[], count: number) {
+  if (count === 1) {
+    activePickerSector.value = null
+    openEditIncident(incidents[0]!)
+    return
+  }
+
+  activePickerSector.value = activePickerSector.value === sector ? null : sector
+}
+
+function onPickerSelect(incident: Incident) {
+  activePickerSector.value = null
+  openEditIncident(incident)
+}
 </script>
 
 <template>
@@ -144,6 +165,7 @@ function formatTime(timestamp: string): string {
       <div
         ref="viewportRef"
         class="ic-sitrep-map__viewport"
+        @click="onViewportClick"
         @touchstart.passive="onTouchStart"
         @touchmove="onTouchMove"
         @touchend="onTouchEnd"
@@ -170,12 +192,19 @@ function formatTime(timestamp: string): string {
               type="button"
               :class="[
                 severityMarkerClass(severity),
-                { 'ic-sitrep-marker--active': hoveredSector === sector },
+                {
+                  'ic-sitrep-marker--active': hoveredSector === sector || activePickerSector === sector,
+                },
               ]"
               :style="{ left: position.left, top: position.top }"
               :aria-label="count > 1
                 ? `${count} incidenten op ${sector}`
                 : `${incidents[0]!.incidentId} op ${sector}`"
+              :aria-expanded="count > 1 ? activePickerSector === sector : undefined"
+              @click.stop="onMarkerClick(sector, incidents, count)"
+              @mousedown.stop
+              @touchstart.stop
+              @pointerdown.stop
               @mouseenter="hoveredSector = sector"
               @mouseleave="hoveredSector = null"
               @focus="hoveredSector = sector"
@@ -192,7 +221,45 @@ function formatTime(timestamp: string): string {
               <span class="ic-sitrep-marker__label">{{ sector }}</span>
 
               <div
-                v-if="hoveredSector === sector"
+                v-if="count > 1 && activePickerSector === sector"
+                class="ic-sitrep-marker-picker"
+                role="menu"
+                @click.stop
+              >
+                <p class="ic-sitrep-marker-picker__heading">
+                  {{ count }} incidenten · {{ sector }}
+                </p>
+                <ul class="ic-sitrep-marker-picker__list">
+                  <li
+                    v-for="incident in incidents"
+                    :key="incident.incidentId"
+                    role="none"
+                  >
+                    <button
+                      type="button"
+                      class="ic-sitrep-marker-picker__item"
+                      role="menuitem"
+                      @click.stop="onPickerSelect(incident)"
+                    >
+                      <span
+                        :class="severityDotClass(getIncidentSeverity(incident))"
+                        class="ic-sitrep-marker-picker__dot"
+                        aria-hidden="true"
+                      />
+                      <span class="ic-sitrep-marker-picker__copy">
+                        <span class="ic-sitrep-marker-picker__id">{{ incident.incidentId }}</span>
+                        <span class="ic-sitrep-marker-picker__type">{{ incident.incidentTypeName }}</span>
+                        <span class="ic-sitrep-marker-picker__meta">
+                          {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              <div
+                v-else-if="hoveredSector === sector"
                 class="ic-sitrep-tooltip"
                 :class="{ 'ic-sitrep-tooltip--stack': count > 1 }"
                 role="tooltip"
@@ -560,6 +627,91 @@ function formatTime(timestamp: string): string {
 .ic-sitrep-tooltip__desc {
   margin-top: 0.375rem;
   color: rgb(255 255 255 / 0.9);
+}
+
+.ic-sitrep-marker-picker {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  width: max-content;
+  max-width: min(18rem, 70vw);
+  max-height: min(16rem, 50vh);
+  overflow-y: auto;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: rgb(28 29 82 / 0.97);
+  color: #fff;
+  text-align: left;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.35);
+}
+
+.ic-sitrep-marker-picker__heading {
+  margin: 0 0 0.375rem;
+  padding: 0 0.25rem 0.375rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.2);
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.ic-sitrep-marker-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ic-sitrep-marker-picker__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ic-sitrep-marker-picker__item:hover,
+.ic-sitrep-marker-picker__item:focus-visible {
+  background: rgb(255 255 255 / 0.12);
+  outline: none;
+}
+
+.ic-sitrep-marker-picker__dot {
+  flex-shrink: 0;
+  margin-top: 0.1875rem;
+}
+
+.ic-sitrep-marker-picker__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.ic-sitrep-marker-picker__id {
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.ic-sitrep-marker-picker__type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ic-accent);
+}
+
+.ic-sitrep-marker-picker__meta {
+  font-size: 0.6875rem;
+  color: rgb(255 255 255 / 0.75);
 }
 
 @keyframes ic-pulse {
