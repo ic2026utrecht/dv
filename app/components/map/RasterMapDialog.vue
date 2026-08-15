@@ -74,6 +74,19 @@ function focusAllowedRegion() {
   focusOnRegion(region)
 }
 
+function focusInitialRegion() {
+  const selected = props.selectedSector?.trim()
+  if (selected) {
+    const region = getSectorCodesBounds([selected])
+    if (region) {
+      focusOnRegion(region)
+      return
+    }
+  }
+
+  focusAllowedRegion()
+}
+
 async function applyInitialView() {
   await nextTick()
 
@@ -88,7 +101,7 @@ async function applyInitialView() {
   // Wait for layout after dialog open + image fit.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      focusAllowedRegion()
+      focusInitialRegion()
     })
   })
 }
@@ -272,12 +285,14 @@ function handlePointerUp(event: PointerEvent) {
       <div class="ic-raster-dialog__confirm-actions">
         <Button
           label="Annuleren"
+          type="button"
           severity="secondary"
           text
           @click="cancelSelection"
         />
         <Button
           label="Bevestigen"
+          type="button"
           icon="pi pi-check"
           @click="confirmSelection"
         />

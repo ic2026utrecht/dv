@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import type { Incident, IncidentStatus, IncidentUpdateEntry } from '~/types/models'
+import type { Incident, IncidentStatus, IncidentUpdate, IncidentUpdateEntry, Location } from '~/types/models'
+import {
+  expandLocationSectors,
+  formatSector,
+  locationOptions,
+  parseSectorCode,
+  RASTER_COLUMNS,
+  RASTER_ROWS,
+} from '~/utils/incidentOptions'
+import { getLocationChangeForEntry } from '~/utils/incidentUpdateLocation'
 
 const props = defineProps<{
   incident: Incident | null
@@ -15,6 +24,7 @@ const { $api } = useNuxtApp()
 const { updateIncident, refreshIncidents } = useSitrep()
 const { displayName, fetchMe } = useStaffAuth()
 const { markRead } = useIncidentFeedUnread()
+const { fetchConfig, config } = useIncidents()
 
 const entries = ref<IncidentUpdateEntry[]>([])
 const loading = ref(false)
@@ -22,6 +32,9 @@ const submitting = ref(false)
 const error = ref<string | null>(null)
 const note = ref('')
 const author = ref('')
+const sectorCode = ref<string | null>(null)
+const mapLocationId = ref<string | null>(null)
+const rasterMapOpen = ref(false)
 const feedRef = ref<HTMLElement | null>(null)
 
 const confirmVisible = ref(false)
@@ -29,10 +42,150 @@ const deleteTarget = ref<IncidentUpdateEntry | null>(null)
 const deletePreview = ref('')
 const deleting = ref(false)
 
+const locations = computed<Location[]>(() => config.value?.locations ?? [])
+
+const locationSelectOptions = computed(() => locationOptions(locations.value))
+
+const selectedLocation = computed(() =>
+  mapLocationId.value
+    ? locations.value.find(location => location.id === mapLocationId.value)
+    : undefined,
+)
+
+const allowedSectors = computed(() => {
+  if (!mapLocationId.value) {
+    return null
+  }
+  return expandLocationSectors(
+    selectedLocation.value,
+    config.value?.raster.rows ?? RASTER_ROWS,
+    config.value?.raster.columns ?? RASTER_COLUMNS,
+  )
+})
+
+const currentSectorCode = computed(() => resolveIncidentSectorCode(props.incident))
+
+const sectorChanged = computed(() => {
+  const next = (sectorCode.value ?? '').trim().toUpperCase()
+  const current = currentSectorCode.value.trim().toUpperCase()
+  return Boolean(next) && next !== current
+})
+
+const locationChanged = computed(() => {
+  if (mapLocationId.value == null) {
+    return false
+  }
+  return mapLocationId.value !== (props.incident?.locationId ?? '')
+})
+
+const canSubmit = computed(() =>
+  Boolean(note.value.trim() || sectorChanged.value || locationChanged.value) && !submitting.value,
+)
+
+const sectorButtonLabel = computed(() => {
+  const selected = (sectorCode.value ?? '').trim().toUpperCase()
+  if (!selected) {
+    return 'Sector kiezen op kaart'
+  }
+  return `Sector ${selected} · wijzigen op kaart`
+})
+
 type FeedItem
   = | { kind: 'date', key: string, label: string }
     | { kind: 'status', key: string, entry: IncidentUpdateEntry }
+    | { kind: 'location', key: string, entry: IncidentUpdateEntry, from: string, to: string }
     | { kind: 'message', key: string, entry: IncidentUpdateEntry, text: string }
+
+function resolveIncidentSectorCode(incident: Incident | null): string {
+  if (!incident) {
+    return ''
+  }
+  if (incident.sectorRow && incident.sectorColumn) {
+    return formatSector(incident.sectorRow, incident.sectorColumn)
+  }
+  const parsed = parseSectorCode(
+    incident.sector,
+    config.value?.raster.rows ?? RASTER_ROWS,
+    config.value?.raster.columns ?? RASTER_COLUMNS,
+  )
+  return parsed?.code ?? ''
+}
+
+function syncLocationFromIncident() {
+  // Do not preselect location — that would disable sectors outside its range.
+  mapLocationId.value = null
+  sectorCode.value = currentSectorCode.value || null
+}
+
+function resolveUpdateStatus(incident: Incident): IncidentStatus {
+  const status = String(incident.status || 'Open').trim()
+  if (status === 'Open' || status === 'In behandeling' || status === 'Afgesloten') {
+    return status
+  }
+  return 'Open'
+}
+
+async function persistSectorChange(code: string) {
+  if (!props.incident || submitting.value) {
+    return
+  }
+
+  const rows = config.value?.raster.rows ?? RASTER_ROWS
+  const columns = config.value?.raster.columns ?? RASTER_COLUMNS
+  const parsedSector = parseSectorCode(code, rows, columns)
+
+  if (!parsedSector) {
+    error.value = 'Kies een geldige raster sector op de kaart'
+    return
+  }
+
+  const nextCode = parsedSector.code
+  const sectorDidChange = nextCode !== currentSectorCode.value.trim().toUpperCase()
+  if (!sectorDidChange && !locationChanged.value) {
+    sectorCode.value = nextCode
+    return
+  }
+
+  submitting.value = true
+  error.value = null
+
+  try {
+    const trimmedAuthor = author.value.trim()
+    const trimmedNote = note.value.trim()
+    const payload: IncidentUpdate = {
+      incidentId: props.incident.incidentId,
+      status: resolveUpdateStatus(props.incident),
+      updateNotes: trimmedNote,
+      updatedBy: trimmedAuthor || undefined,
+      sectorRow: parsedSector.row,
+      sectorColumn: parsedSector.column,
+      sectorLabel: '',
+    }
+
+    if (locationChanged.value) {
+      payload.locationId = mapLocationId.value || undefined
+    }
+
+    await updateIncident(payload)
+    note.value = ''
+    sectorCode.value = nextCode
+    mapLocationId.value = null
+    emit('noteAdded')
+    await loadHistory()
+    await markRead(props.incident.incidentId).catch(() => {})
+  }
+  catch (err: unknown) {
+    error.value = err instanceof Error ? err.message : 'Sector opslaan mislukt'
+  }
+  finally {
+    submitting.value = false
+  }
+}
+
+async function onMapSectorSelect(code: string) {
+  sectorCode.value = code
+  await persistSectorChange(code)
+}
 
 function statusBadgeClass(status: IncidentStatus): string {
   switch (status) {
@@ -104,8 +257,14 @@ function statusChanged(entry: IncidentUpdateEntry): boolean {
   return Boolean(entry.previousStatus && entry.status !== entry.previousStatus)
 }
 
+function locationChange(entry: IncidentUpdateEntry, index: number) {
+  return getLocationChangeForEntry(entries.value, index, locations.value)
+}
+
 function isVisibleInFeed(entry: IncidentUpdateEntry, index: number): boolean {
-  return statusChanged(entry) || messageText(entry, index) !== null
+  return statusChanged(entry)
+    || locationChange(entry, index) !== null
+    || messageText(entry, index) !== null
 }
 
 const visibleEntryCount = computed(() =>
@@ -121,13 +280,29 @@ function deletePreviewLabel(entry: IncidentUpdateEntry): string {
   if (statusChanged(entry)) {
     return `Statuswijziging: ${entry.previousStatus} → ${entry.status}`
   }
+  const change = index >= 0 ? locationChange(entry, index) : null
+  if (change) {
+    return `Locatie: ${change.from} → ${change.to}`
+  }
   const text = index >= 0 ? messageText(entry, index) : entry.notes.trim()
   return text || 'Update'
 }
 
-function askDelete(entry: IncidentUpdateEntry) {
+function askDelete(entry: IncidentUpdateEntry, kind: 'status' | 'location' | 'message' = 'message') {
   deleteTarget.value = entry
-  deletePreview.value = deletePreviewLabel(entry)
+  const index = entryIndex(entry)
+  if (kind === 'location') {
+    const change = index >= 0 ? locationChange(entry, index) : null
+    deletePreview.value = change
+      ? `Locatie: ${change.from} → ${change.to}`
+      : deletePreviewLabel(entry)
+  }
+  else if (kind === 'status' && statusChanged(entry)) {
+    deletePreview.value = `Statuswijziging: ${entry.previousStatus} → ${entry.status}`
+  }
+  else {
+    deletePreview.value = deletePreviewLabel(entry)
+  }
   confirmVisible.value = true
 }
 
@@ -186,6 +361,17 @@ const feedItems = computed<FeedItem[]>(() => {
       })
     }
 
+    const change = locationChange(entry, index)
+    if (change) {
+      items.push({
+        kind: 'location',
+        key: `location-${entry.id}`,
+        entry,
+        from: change.from,
+        to: change.to,
+      })
+    }
+
     const text = messageText(entry, index)
     if (text) {
       items.push({
@@ -233,12 +419,23 @@ function scrollToBottom() {
 }
 
 async function submitNote() {
-  if (!props.incident || submitting.value) {
+  if (!props.incident || submitting.value || !canSubmit.value) {
     return
   }
 
   const trimmedNote = note.value.trim()
-  if (!trimmedNote) {
+  const rows = config.value?.raster.rows ?? RASTER_ROWS
+  const columns = config.value?.raster.columns ?? RASTER_COLUMNS
+  const parsedSector = parseSectorCode(sectorCode.value, rows, columns)
+
+  if (sectorChanged.value && !parsedSector) {
+    error.value = 'Kies een geldige raster sector op de kaart'
+    return
+  }
+
+  // Sector-only changes are saved when confirming on the map.
+  if (!trimmedNote && sectorChanged.value && parsedSector) {
+    await persistSectorChange(parsedSector.code)
     return
   }
 
@@ -247,19 +444,35 @@ async function submitNote() {
 
   try {
     const trimmedAuthor = author.value.trim()
-    await updateIncident({
+    const payload: IncidentUpdate = {
       incidentId: props.incident.incidentId,
-      status: props.incident.status,
+      status: resolveUpdateStatus(props.incident),
       updateNotes: trimmedNote,
       updatedBy: trimmedAuthor || undefined,
-    })
+    }
+
+    if (sectorChanged.value && parsedSector) {
+      payload.sectorRow = parsedSector.row
+      payload.sectorColumn = parsedSector.column
+      payload.sectorLabel = ''
+    }
+
+    if (locationChanged.value) {
+      payload.locationId = mapLocationId.value || undefined
+    }
+
+    await updateIncident(payload)
     note.value = ''
+    if (parsedSector) {
+      sectorCode.value = parsedSector.code
+    }
+    mapLocationId.value = null
     emit('noteAdded')
     await loadHistory()
     await markRead(props.incident.incidentId).catch(() => {})
   }
   catch (err: unknown) {
-    error.value = err instanceof Error ? err.message : 'Notitie opslaan mislukt'
+    error.value = err instanceof Error ? err.message : 'Update opslaan mislukt'
   }
   finally {
     submitting.value = false
@@ -274,10 +487,14 @@ function handleComposerKeydown(event: KeyboardEvent) {
 }
 
 watch(
-  () => [props.incident?.incidentId, props.refreshKey] as const,
+  () => [props.incident?.incidentId, props.incident?.sector, props.incident?.sectorRow, props.incident?.sectorColumn, props.incident?.locationId, props.refreshKey] as const,
   async () => {
-    await fetchMe().catch(() => {})
+    await Promise.all([
+      fetchMe().catch(() => {}),
+      fetchConfig().catch(() => {}),
+    ])
     author.value = displayName.value || props.incident?.actionOwner || ''
+    syncLocationFromIncident()
     loadHistory()
   },
   { immediate: true },
@@ -339,7 +556,33 @@ watch(displayName, (name) => {
                 aria-label="Statusupdate verwijderen"
                 title="Verwijderen"
                 :disabled="deleting"
-                @click="askDelete(item.entry)"
+                @click="askDelete(item.entry, 'status')"
+              >
+                <i class="pi pi-trash" aria-hidden="true" />
+              </button>
+            </div>
+            <footer v-if="item.entry.updatedBy" class="ic-update-feed__system-meta">
+              <span class="ic-update-feed__author">{{ item.entry.updatedBy }}</span>
+              <time>{{ formatTime(item.entry.createdAt) }}</time>
+            </footer>
+            <time v-else>{{ formatTime(item.entry.createdAt) }}</time>
+          </div>
+
+          <div
+            v-else-if="item.kind === 'location'"
+            class="ic-update-feed__system"
+          >
+            <div class="ic-update-feed__item-actions">
+              <span class="ic-update-feed__location">
+                Locatie gewijzigd: {{ item.from }} → {{ item.to }}
+              </span>
+              <button
+                type="button"
+                class="ic-update-feed__delete"
+                aria-label="Locatie-update verwijderen"
+                title="Verwijderen"
+                :disabled="deleting"
+                @click="askDelete(item.entry, 'location')"
               >
                 <i class="pi pi-trash" aria-hidden="true" />
               </button>
@@ -365,7 +608,7 @@ watch(displayName, (name) => {
                 aria-label="Update verwijderen"
                 title="Verwijderen"
                 :disabled="deleting"
-                @click="askDelete(item.entry)"
+                @click="askDelete(item.entry, 'message')"
               >
                 <i class="pi pi-trash" aria-hidden="true" />
               </button>
@@ -397,6 +640,25 @@ watch(displayName, (name) => {
         :disabled="submitting"
       />
 
+      <button
+        type="button"
+        class="ic-update-feed__map-btn"
+        :disabled="submitting"
+        @click="rasterMapOpen = true"
+      >
+        <i class="pi pi-map" aria-hidden="true" />
+        <span>{{ sectorButtonLabel }}</span>
+      </button>
+
+      <RasterMapDialog
+        v-model="rasterMapOpen"
+        v-model:location-id="mapLocationId"
+        :location-options="locationSelectOptions"
+        :selected-sector="sectorCode"
+        :allowed-sectors="allowedSectors"
+        @select="onMapSectorSelect"
+      />
+
       <div class="ic-update-feed__composer-row">
         <Textarea
           v-model="note"
@@ -412,7 +674,7 @@ watch(displayName, (name) => {
           icon="pi pi-send"
           aria-label="Update versturen"
           :loading="submitting"
-          :disabled="!note.trim() || submitting"
+          :disabled="!canSubmit"
         />
       </div>
     </form>
@@ -629,6 +891,20 @@ watch(displayName, (name) => {
   color: var(--ic-brand-dark);
 }
 
+.ic-update-feed__location {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  background: rgb(45 46 126 / 0.1);
+  color: var(--ic-brand-dark);
+}
+
 .ic-update-feed__bubble {
   align-self: flex-start;
   max-width: 92%;
@@ -681,6 +957,43 @@ watch(displayName, (name) => {
 
 .ic-update-feed__author-input {
   width: 100%;
+}
+
+.ic-update-feed__map-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(135 161 198 / 0.45);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--ic-brand-dark);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ic-update-feed__map-btn:hover:not(:disabled),
+.ic-update-feed__map-btn:focus-visible {
+  border-color: var(--ic-brand);
+  color: var(--ic-brand);
+  background: rgb(45 46 126 / 0.04);
+  outline: none;
+}
+
+.ic-update-feed__map-btn--changed {
+  border-color: var(--ic-orange);
+  color: var(--ic-brand);
+  background: rgb(230 151 50 / 0.08);
+}
+
+.ic-update-feed__map-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .ic-update-feed__composer-row {

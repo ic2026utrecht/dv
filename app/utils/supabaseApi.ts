@@ -140,6 +140,7 @@ function mapIncidentUpdateRows(rows: IncidentUpdateRow[]): IncidentUpdateEntry[]
       updatedBy: row.updated_by ?? '',
       notes: row.notes ?? '',
       hasPayloadChanges: payloadHasChanges(row.payload),
+      payload: row.payload ?? {},
     }
   })
 }

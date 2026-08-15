@@ -184,6 +184,7 @@ export interface IncidentUpdateEntry {
   updatedBy: string
   notes: string
   hasPayloadChanges: boolean
+  payload?: Record<string, unknown>
 }
 
 export interface IncidentFeedRead {

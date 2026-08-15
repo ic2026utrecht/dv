@@ -165,21 +165,21 @@ export function incidentToEditForm(
 export function editFormToIncidentUpdate(
   incidentId: string,
   form: IncidentEditForm,
+  previous: Incident | null = null,
 ): IncidentUpdate {
   const parsedSector = parseSectorCode(form.sectorCode, RASTER_ROWS, RASTER_COLUMNS)
   const sectorLabel = parsedSector
     ? ''
     : (form.sectorLabel.trim() || form.sectorCode.trim())
+  const locationId = form.locationId
+  const sectorRow = parsedSector?.row ?? ''
+  const sectorColumn = parsedSector?.column ?? null
 
-  return {
+  const update: IncidentUpdate = {
     incidentId,
     status: form.status,
     timestamp: fromDatetimeLocalValue(form.timestamp),
     department: form.department,
-    locationId: form.locationId,
-    sectorRow: parsedSector?.row ?? '',
-    sectorColumn: parsedSector?.column ?? null,
-    sectorLabel,
     incidentTypeId: form.incidentTypeId,
     description: form.description.trim(),
     helpOptionIds: form.helpOptionIds,
@@ -197,4 +197,43 @@ export function editFormToIncidentUpdate(
     closureResult: form.closureResult.trim() || undefined,
     parentId: (form.parentId ?? '').trim() || null,
   }
+
+  const locationChanged = !previous || locationFieldsChanged(previous, {
+    locationId,
+    sectorRow,
+    sectorColumn,
+    sectorLabel,
+  })
+
+  if (locationChanged) {
+    update.locationId = locationId
+    update.sectorRow = sectorRow
+    update.sectorColumn = sectorColumn
+    update.sectorLabel = sectorLabel
+  }
+
+  return update
+}
+
+function locationFieldsChanged(
+  previous: Incident,
+  next: {
+    locationId: string
+    sectorRow: string
+    sectorColumn: number | null
+    sectorLabel: string
+  },
+): boolean {
+  const prevLocationId = previous.locationId ?? ''
+  const prevSectorRow = previous.sectorRow ?? ''
+  const prevSectorColumn = previous.sectorColumn ?? null
+  const prevSectorLabel = previous.sectorLabel
+    || (!previous.sectorRow && !previous.sectorColumn ? (previous.sector || '') : '')
+
+  return (
+    prevLocationId !== next.locationId
+    || prevSectorRow !== next.sectorRow
+    || prevSectorColumn !== next.sectorColumn
+    || prevSectorLabel !== next.sectorLabel
+  )
 }

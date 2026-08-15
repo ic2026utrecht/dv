@@ -281,7 +281,7 @@ function submit() {
     return
   }
 
-  const payload = editFormToIncidentUpdate(props.incident.incidentId, form)
+  const payload = editFormToIncidentUpdate(props.incident.incidentId, form, props.incident)
   const actor = displayName.value?.trim()
     || (form.status === 'Afgesloten' ? form.closedBy.trim() : '')
     || form.actionOwner.trim()
