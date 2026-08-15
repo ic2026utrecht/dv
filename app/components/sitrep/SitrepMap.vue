@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const { filterIncidents } = useSitrepQuery()
 const { openEditIncident } = useSitrepEditIncident()
+const { hoveredIncidentId } = useSitrepMapHighlight()
 const hoveredSector = ref<string | null>(null)
 const activePickerSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
@@ -81,18 +82,33 @@ const markers = computed(() => {
     }
   }
 
-  return Array.from(bySector.entries()).map(([sector, group]) => ({
-    sector,
-    position: group.position,
-    incidents: group.incidents,
-    count: group.incidents.length,
-    severity: getHighestSeverity(group.severities),
-  }))
+  return Array.from(bySector.entries()).map(([sector, group]) => {
+    const highlightedIncident = listHoveredIncident.value?.sector === sector
+      ? listHoveredIncident.value
+      : null
+
+    return {
+      sector,
+      position: group.position,
+      incidents: group.incidents,
+      count: group.incidents.length,
+      severity: getHighestSeverity(group.severities),
+      highlightedIncident,
+    }
+  })
 })
 
 const incidentCountOnMap = computed(() =>
   markers.value.reduce((total, marker) => total + marker.count, 0),
 )
+
+const listHoveredIncident = computed(() => {
+  const id = hoveredIncidentId.value
+  if (!id) {
+    return null
+  }
+  return filterIncidents(props.incidents).find(incident => incident.incidentId === id) ?? null
+})
 
 function formatTime(timestamp: string): string {
   const date = new Date(timestamp)
@@ -187,13 +203,15 @@ function onPickerSelect(incident: Incident) {
           >
           <div class="ic-sitrep-map__markers" :style="markerLayerStyle">
             <button
-              v-for="{ sector, position, incidents, count, severity } in markers"
+              v-for="{ sector, position, incidents, count, severity, highlightedIncident } in markers"
               :key="sector"
               type="button"
               :class="[
                 severityMarkerClass(severity),
                 {
-                  'ic-sitrep-marker--active': hoveredSector === sector || activePickerSector === sector,
+                  'ic-sitrep-marker--active': hoveredSector === sector
+                    || activePickerSector === sector
+                    || highlightedIncident !== null,
                 },
               ]"
               :style="{ left: position.left, top: position.top }"
@@ -307,6 +325,28 @@ function onPickerSelect(incident: Incident) {
                     {{ incidents[0]!.description }}
                   </p>
                 </template>
+              </div>
+
+              <div
+                v-else-if="highlightedIncident"
+                class="ic-sitrep-tooltip"
+                role="tooltip"
+              >
+                <p class="ic-sitrep-tooltip__id">
+                  {{ highlightedIncident.incidentId }}
+                </p>
+                <p class="ic-sitrep-tooltip__type">
+                  {{ highlightedIncident.incidentTypeName }}
+                </p>
+                <p class="ic-sitrep-tooltip__loc">
+                  {{ highlightedIncident.locationName }} · {{ highlightedIncident.sector }}
+                </p>
+                <p class="ic-sitrep-tooltip__meta">
+                  {{ highlightedIncident.priority }} · {{ highlightedIncident.status }} · {{ formatTime(highlightedIncident.timestamp) }}
+                </p>
+                <p v-if="highlightedIncident.description" class="ic-sitrep-tooltip__desc">
+                  {{ highlightedIncident.description }}
+                </p>
               </div>
             </button>
           </div>

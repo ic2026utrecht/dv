@@ -24,6 +24,8 @@ defineEmits<{
   toggle: []
 }>()
 
+const { setHoveredIncidentId } = useSitrepMapHighlight()
+
 const variant = computed(() => props.variant ?? 'standalone')
 
 const resolvedSeverity = computed(() =>
@@ -68,6 +70,18 @@ function statusButtonLabel(status: string): string {
       return 'Status wijzigen'
   }
 }
+
+function onRowMouseEnter() {
+  if (props.incident.sector) {
+    setHoveredIncidentId(props.incident.incidentId)
+  }
+}
+
+function onRowMouseLeave() {
+  if (props.incident.sector) {
+    setHoveredIncidentId(null)
+  }
+}
 </script>
 
 <template>
@@ -77,6 +91,8 @@ function statusButtonLabel(status: string): string {
       severityRowBtnClass(resolvedSeverity),
       `ic-sitrep-list__row--${variant}`,
     ]"
+    @mouseenter="onRowMouseEnter"
+    @mouseleave="onRowMouseLeave"
   >
     <button
       v-if="variant === 'group'"
