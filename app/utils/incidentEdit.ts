@@ -23,6 +23,8 @@ export interface IncidentEditForm {
   helpOptionIds: string[]
   priority: Priority
   reporter: string
+  personsInvolved: string
+  ambulanceCalled: 'ja' | 'nee' | null
   flagEhbo: boolean
   flagBeveiliging: boolean
   flagHcSafety: boolean
@@ -35,6 +37,67 @@ export interface IncidentEditForm {
   closedBy: string
   closureResult: string
   parentId: string
+}
+
+const BETROKKENEN_SUFFIX_RE = /\s*\[betrokkenen:\s*(\d+)\]\s*$/i
+
+function findHelp112OptionId(config: IncidentConfig | null): string | undefined {
+  return config?.helpOptions.find(
+    option => option.name.trim().toLowerCase() === '112 gebeld',
+  )?.id
+}
+
+function parseEhboFromDescription(description: string): {
+  cleanDescription: string
+  personsInvolved: string
+} {
+  const match = description.match(BETROKKENEN_SUFFIX_RE)
+  if (!match) {
+    return { cleanDescription: description, personsInvolved: '' }
+  }
+
+  return {
+    cleanDescription: description.replace(BETROKKENEN_SUFFIX_RE, '').trimEnd(),
+    personsInvolved: match[1] ?? '',
+  }
+}
+
+function formatEhboDescription(description: string, personsInvolved: string): string {
+  const clean = description.replace(BETROKKENEN_SUFFIX_RE, '').trim()
+  if (!personsInvolved) {
+    return clean
+  }
+
+  return `${clean} [betrokkenen: ${personsInvolved}]`
+}
+
+function resolveAmbulanceCalled(
+  helpOptionIds: string[],
+  config: IncidentConfig | null,
+): 'ja' | 'nee' | null {
+  const help112Id = findHelp112OptionId(config)
+  if (!help112Id) {
+    return null
+  }
+
+  return helpOptionIds.includes(help112Id) ? 'ja' : 'nee'
+}
+
+function applyAmbulanceToHelpOptionIds(
+  helpOptionIds: string[],
+  config: IncidentConfig | null,
+  ambulanceCalled: 'ja' | 'nee' | null,
+): string[] {
+  const help112Id = findHelp112OptionId(config)
+  const filtered = help112Id
+    ? helpOptionIds.filter(id => id !== help112Id)
+    : [...helpOptionIds]
+
+  if (ambulanceCalled === 'ja' && help112Id) {
+    filtered.push(help112Id)
+  }
+
+  return filtered
 }
 
 function normalizeName(value: string): string {
@@ -135,6 +198,9 @@ export function incidentToEditForm(
 ): IncidentEditForm {
   const sectorCode = resolveSectorCode(incident)
   const parsedSector = parseSectorCode(sectorCode, RASTER_ROWS, RASTER_COLUMNS)
+  const ehboDescription = parseEhboFromDescription(incident.description || '')
+  const resolvedHelpOptionIds = resolveHelpOptionIds(incident, config)
+  const help112Id = findHelp112OptionId(config)
 
   return {
     timestamp: toDatetimeLocalValue(incident.timestamp),
@@ -143,10 +209,16 @@ export function incidentToEditForm(
     sectorCode,
     sectorLabel: incident.sectorLabel || (parsedSector ? '' : incident.sector || ''),
     incidentTypeId: resolveIncidentTypeId(incident, config),
-    description: incident.description || '',
-    helpOptionIds: resolveHelpOptionIds(incident, config),
+    description: ehboDescription.cleanDescription,
+    helpOptionIds: help112Id
+      ? resolvedHelpOptionIds.filter(id => id !== help112Id)
+      : resolvedHelpOptionIds,
     priority: incident.priority,
     reporter: incident.reporter || '',
+    personsInvolved: incident.department === 'EHBO' ? ehboDescription.personsInvolved : '',
+    ambulanceCalled: incident.department === 'EHBO'
+      ? resolveAmbulanceCalled(resolvedHelpOptionIds, config)
+      : null,
     flagEhbo: incident.flagEhbo ?? false,
     flagBeveiliging: incident.flagBeveiliging ?? false,
     flagHcSafety: incident.flagHcSafety ?? false,
@@ -166,6 +238,7 @@ export function editFormToIncidentUpdate(
   incidentId: string,
   form: IncidentEditForm,
   previous: Incident | null = null,
+  config: IncidentConfig | null = null,
 ): IncidentUpdate {
   const parsedSector = parseSectorCode(form.sectorCode, RASTER_ROWS, RASTER_COLUMNS)
   const sectorLabel = parsedSector
@@ -174,6 +247,12 @@ export function editFormToIncidentUpdate(
   const locationId = form.locationId
   const sectorRow = parsedSector?.row ?? ''
   const sectorColumn = parsedSector?.column ?? null
+  const description = form.department === 'EHBO'
+    ? formatEhboDescription(form.description, form.personsInvolved)
+    : form.description.trim()
+  const helpOptionIds = form.department === 'EHBO'
+    ? applyAmbulanceToHelpOptionIds(form.helpOptionIds, config, form.ambulanceCalled)
+    : form.helpOptionIds
 
   const update: IncidentUpdate = {
     incidentId,
@@ -181,8 +260,8 @@ export function editFormToIncidentUpdate(
     timestamp: fromDatetimeLocalValue(form.timestamp),
     department: form.department,
     incidentTypeId: form.incidentTypeId,
-    description: form.description.trim(),
-    helpOptionIds: form.helpOptionIds,
+    description,
+    helpOptionIds,
     priority: form.priority,
     reporter: form.reporter.trim(),
     flagEhbo: form.flagEhbo,

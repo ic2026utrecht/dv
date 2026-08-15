@@ -42,6 +42,8 @@ const form = reactive<IncidentEditForm>({
   helpOptionIds: [],
   priority: 'Middel',
   reporter: '',
+  personsInvolved: '',
+  ambulanceCalled: null,
   flagEhbo: false,
   flagBeveiliging: false,
   flagHcSafety: false,
@@ -72,6 +74,13 @@ const teamFlags = [
   { key: 'flagReiniging' as const, label: 'Reiniging' },
   { key: 'flagVeiligheid' as const, label: 'Veiligheid' },
 ]
+
+const ambulanceOptions = [
+  { label: 'Ja', value: 'ja' as const },
+  { label: 'Nee', value: 'nee' as const },
+]
+
+const isEhbo = computed(() => form.department === 'EHBO')
 
 watch(
   () => props.incident,
@@ -159,6 +168,10 @@ watch(
     }
     form.incidentTypeId = ''
     form.helpOptionIds = []
+    if (department !== 'EHBO') {
+      form.personsInvolved = ''
+      form.ambulanceCalled = null
+    }
   },
 )
 
@@ -281,7 +294,12 @@ function submit() {
     return
   }
 
-  const payload = editFormToIncidentUpdate(props.incident.incidentId, form, props.incident)
+  const payload = editFormToIncidentUpdate(
+    props.incident.incidentId,
+    form,
+    props.incident,
+    config.value,
+  )
   const actor = displayName.value?.trim()
     || (form.status === 'Afgesloten' ? form.closedBy.trim() : '')
     || form.actionOwner.trim()
@@ -447,6 +465,27 @@ function submit() {
               class="ic-field w-full"
             />
           </IcFormField>
+
+          <template v-if="isEhbo">
+            <IcFormField label="Aantal betrokkenen" html-for="sitrep-edit-persons" class="mt-4">
+              <Select
+                id="sitrep-edit-persons"
+                v-model="form.personsInvolved"
+                :options="config?.personsCountOptions ?? []"
+                option-label="label"
+                option-value="value"
+                placeholder="Aantal"
+                class="ic-field w-full"
+              />
+            </IcFormField>
+
+            <IcFormField label="112 gebeld?" class="mt-4">
+              <ChoiceButtons
+                v-model="form.ambulanceCalled"
+                :options="ambulanceOptions"
+              />
+            </IcFormField>
+          </template>
 
           <IcFormField label="Prioriteit" class="mt-4">
             <ChoiceButtons
