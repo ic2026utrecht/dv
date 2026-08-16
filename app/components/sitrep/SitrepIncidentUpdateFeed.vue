@@ -21,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const { $api } = useNuxtApp()
-const { updateIncident, refreshIncidents } = useSitrep()
+const { updateIncident, refreshIncidents, lastUpdated } = useSitrep()
 const { displayName, fetchMe } = useStaffAuth()
 const { markRead } = useIncidentFeedUnread()
 const { fetchConfig, config } = useIncidents()
@@ -386,36 +386,43 @@ const feedItems = computed<FeedItem[]>(() => {
   return items
 })
 
-async function loadHistory() {
+async function loadHistory(options: { silent?: boolean } = {}) {
   if (!props.incident) {
     entries.value = []
     error.value = null
     return
   }
 
-  loading.value = true
+  const silent = options.silent ?? entries.value.length > 0
+  if (!silent) {
+    loading.value = true
+  }
   error.value = null
 
   try {
     const response = await $api.incidents.getUpdateHistory(props.incident.incidentId)
     entries.value = response.data ?? []
-    await nextTick()
-    scrollToBottom()
   }
   catch (err: unknown) {
-    entries.value = []
+    if (!silent) {
+      entries.value = []
+    }
     error.value = err instanceof Error ? err.message : 'Updates laden mislukt'
   }
   finally {
     loading.value = false
   }
+
+  await nextTick()
+  scrollToBottom()
 }
 
 function scrollToBottom() {
-  if (!feedRef.value) {
+  const el = feedRef.value
+  if (!el) {
     return
   }
-  feedRef.value.scrollTop = feedRef.value.scrollHeight
+  el.scrollTop = el.scrollHeight
 }
 
 async function submitNote() {
@@ -488,17 +495,29 @@ function handleComposerKeydown(event: KeyboardEvent) {
 
 watch(
   () => [props.incident?.incidentId, props.incident?.sector, props.incident?.sectorRow, props.incident?.sectorColumn, props.incident?.locationId, props.refreshKey] as const,
-  async () => {
+  async (current, previous) => {
     await Promise.all([
       fetchMe().catch(() => {}),
       fetchConfig().catch(() => {}),
     ])
     author.value = displayName.value || props.incident?.actionOwner || ''
     syncLocationFromIncident()
-    loadHistory()
+
+    const incidentChanged = !previous || current[0] !== previous[0]
+    if (incidentChanged) {
+      entries.value = []
+    }
+    await loadHistory({ silent: !incidentChanged && entries.value.length > 0 })
   },
   { immediate: true },
 )
+
+watch(lastUpdated, () => {
+  if (!props.incident?.incidentId || entries.value.length === 0) {
+    return
+  }
+  loadHistory({ silent: true }).catch(() => {})
+})
 
 watch(displayName, (name) => {
   if (name && !author.value.trim()) {
@@ -519,7 +538,7 @@ watch(displayName, (name) => {
     </header>
 
     <div ref="feedRef" class="ic-update-feed__messages">
-      <div v-if="loading" class="ic-update-feed__state">
+      <div v-if="loading && entries.length === 0" class="ic-update-feed__state">
         <i class="pi pi-spin pi-spinner" aria-hidden="true" />
         <span>Updates laden…</span>
       </div>
@@ -532,11 +551,11 @@ watch(displayName, (name) => {
         Geen incident geselecteerd
       </p>
 
-      <p v-else-if="feedItems.length === 0" class="ic-update-feed__state">
+      <p v-else-if="feedItems.length === 0 && !loading" class="ic-update-feed__state">
         Nog geen updates. Voeg hieronder een notitie toe.
       </p>
 
-      <template v-else>
+      <template v-if="feedItems.length > 0">
         <template v-for="item in feedItems" :key="item.key">
           <div v-if="item.kind === 'date'" class="ic-update-feed__date">
             <span>{{ item.label }}</span>

@@ -15,6 +15,8 @@ const hoveredSector = ref<string | null>(null)
 const activePickerSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
+const sectionRef = ref<HTMLElement | null>(null)
+const markerEls = new Map<string, HTMLElement>()
 
 const pinchZoom = usePinchZoom({ maxScale: 2.5 })
 const {
@@ -110,6 +112,126 @@ const listHoveredIncident = computed(() => {
   return filterIncidents(props.incidents).find(incident => incident.incidentId === id) ?? null
 })
 
+type OverlayPlacement = 'above' | 'below'
+
+const overlayPlacement = ref<OverlayPlacement>('above')
+const overlayStyle = ref<{ left: string, top: string } | null>(null)
+
+function setMarkerRef(sector: string, el: Element | { $el?: Element } | null) {
+  const node = el instanceof HTMLElement ? el : null
+  if (node) {
+    markerEls.set(sector, node)
+  }
+  else {
+    markerEls.delete(sector)
+  }
+}
+
+const overlaySector = computed(() => {
+  if (activePickerSector.value) {
+    return activePickerSector.value
+  }
+  if (hoveredSector.value) {
+    return hoveredSector.value
+  }
+  return listHoveredIncident.value?.sector ?? null
+})
+
+const overlayMarker = computed(() => {
+  const sector = overlaySector.value
+  if (!sector) {
+    return null
+  }
+  return markers.value.find(marker => marker.sector === sector) ?? null
+})
+
+const overlayMode = computed<'picker' | 'hover' | 'highlight' | null>(() => {
+  const sector = overlaySector.value
+  if (!sector || !overlayMarker.value) {
+    return null
+  }
+  if (activePickerSector.value === sector) {
+    return 'picker'
+  }
+  if (hoveredSector.value === sector) {
+    return 'hover'
+  }
+  if (listHoveredIncident.value?.sector === sector) {
+    return 'highlight'
+  }
+  return null
+})
+
+const overlayIncident = computed(() => {
+  if (!overlayMarker.value) {
+    return null
+  }
+  if (overlayMode.value === 'highlight' && overlayMarker.value.highlightedIncident) {
+    return overlayMarker.value.highlightedIncident
+  }
+  return overlayMarker.value.incidents[0] ?? null
+})
+
+function updateOverlayPosition() {
+  const sector = overlaySector.value
+  const section = sectionRef.value
+  if (!sector || !section) {
+    overlayStyle.value = null
+    return
+  }
+
+  const marker = markerEls.get(sector)
+  if (!marker) {
+    overlayStyle.value = null
+    return
+  }
+
+  const sectionRect = section.getBoundingClientRect()
+  const markerRect = marker.getBoundingClientRect()
+  const centerX = markerRect.left + markerRect.width / 2 - sectionRect.left
+  const markerTop = markerRect.top - sectionRect.top
+  const markerBottom = markerRect.bottom - sectionRect.top
+  const preferAbove = markerTop >= sectionRect.height - markerBottom
+
+  overlayPlacement.value = preferAbove ? 'above' : 'below'
+  overlayStyle.value = {
+    left: `${centerX}px`,
+    top: preferAbove ? `${markerTop}px` : `${markerBottom}px`,
+  }
+}
+
+let overlayPositionFrame = 0
+
+function scheduleOverlayPositionUpdate() {
+  if (!import.meta.client) {
+    return
+  }
+  cancelAnimationFrame(overlayPositionFrame)
+  overlayPositionFrame = requestAnimationFrame(() => {
+    updateOverlayPosition()
+  })
+}
+
+watch([overlaySector, scale, transformStyle, hoveredIncidentId], () => {
+  scheduleOverlayPositionUpdate()
+}, { deep: true })
+
+watch(viewportRef, (viewport, _, onCleanup) => {
+  if (!import.meta.client || !viewport) {
+    return
+  }
+
+  const observer = new ResizeObserver(() => {
+    scheduleOverlayPositionUpdate()
+  })
+  observer.observe(viewport)
+  onCleanup(() => observer.disconnect())
+})
+
+onMounted(() => {
+  scheduleOverlayPositionUpdate()
+})
+
 function formatTime(timestamp: string): string {
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) {
@@ -133,6 +255,7 @@ function onMarkerClick(sector: string, incidents: Incident[], count: number) {
   }
 
   activePickerSector.value = activePickerSector.value === sector ? null : sector
+  scheduleOverlayPositionUpdate()
 }
 
 function onPickerSelect(incident: Incident) {
@@ -142,7 +265,7 @@ function onPickerSelect(incident: Incident) {
 </script>
 
 <template>
-  <section class="ic-sitrep-map ic-sitrep-map--panel">
+  <section ref="sectionRef" class="ic-sitrep-map ic-sitrep-map--panel">
     <header class="ic-sitrep-map__header">
       <div class="ic-sitrep-map__header-main">
 
@@ -205,6 +328,7 @@ function onPickerSelect(incident: Incident) {
             <button
               v-for="{ sector, position, incidents, count, severity, highlightedIncident } in markers"
               :key="sector"
+              :ref="el => setMarkerRef(sector, el)"
               type="button"
               :class="[
                 severityMarkerClass(severity),
@@ -223,9 +347,9 @@ function onPickerSelect(incident: Incident) {
               @mousedown.stop
               @touchstart.stop
               @pointerdown.stop
-              @mouseenter="hoveredSector = sector"
+              @mouseenter="hoveredSector = sector; scheduleOverlayPositionUpdate()"
               @mouseleave="hoveredSector = null"
-              @focus="hoveredSector = sector"
+              @focus="hoveredSector = sector; scheduleOverlayPositionUpdate()"
               @blur="hoveredSector = null"
             >
               <span class="ic-sitrep-marker__pulse" aria-hidden="true" />
@@ -237,120 +361,108 @@ function onPickerSelect(incident: Incident) {
                 {{ count }}
               </span>
               <span class="ic-sitrep-marker__label">{{ sector }}</span>
-
-              <div
-                v-if="count > 1 && activePickerSector === sector"
-                class="ic-sitrep-marker-picker"
-                role="menu"
-                @click.stop
-              >
-                <p class="ic-sitrep-marker-picker__heading">
-                  {{ count }} incidenten · {{ sector }}
-                </p>
-                <ul class="ic-sitrep-marker-picker__list">
-                  <li
-                    v-for="incident in incidents"
-                    :key="incident.incidentId"
-                    role="none"
-                  >
-                    <button
-                      type="button"
-                      class="ic-sitrep-marker-picker__item"
-                      role="menuitem"
-                      @click.stop="onPickerSelect(incident)"
-                    >
-                      <span
-                        :class="severityDotClass(getIncidentSeverity(incident))"
-                        class="ic-sitrep-marker-picker__dot"
-                        aria-hidden="true"
-                      />
-                      <span class="ic-sitrep-marker-picker__copy">
-                        <span class="ic-sitrep-marker-picker__id">{{ incident.incidentId }}</span>
-                        <span class="ic-sitrep-marker-picker__type">{{ incident.incidentTypeName }}</span>
-                        <span class="ic-sitrep-marker-picker__meta">
-                          {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              </div>
-
-              <div
-                v-else-if="hoveredSector === sector"
-                class="ic-sitrep-tooltip"
-                :class="{ 'ic-sitrep-tooltip--stack': count > 1 }"
-                role="tooltip"
-              >
-                <template v-if="count > 1">
-                  <p class="ic-sitrep-tooltip__heading">
-                    {{ count }} incidenten · {{ sector }}
-                  </p>
-                  <div
-                    v-for="incident in incidents"
-                    :key="incident.incidentId"
-                    class="ic-sitrep-tooltip__entry"
-                  >
-                    <p class="ic-sitrep-tooltip__id">
-                      {{ incident.incidentId }}
-                    </p>
-                    <p class="ic-sitrep-tooltip__type">
-                      {{ incident.incidentTypeName }}
-                    </p>
-                    <p class="ic-sitrep-tooltip__loc">
-                      {{ incident.locationName }} · {{ incident.sector }}
-                    </p>
-                    <p class="ic-sitrep-tooltip__meta">
-                      {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
-                    </p>
-                    <p v-if="incident.description" class="ic-sitrep-tooltip__desc">
-                      {{ incident.description }}
-                    </p>
-                  </div>
-                </template>
-                <template v-else>
-                  <p class="ic-sitrep-tooltip__id">
-                    {{ incidents[0]!.incidentId }}
-                  </p>
-                  <p class="ic-sitrep-tooltip__type">
-                    {{ incidents[0]!.incidentTypeName }}
-                  </p>
-                  <p class="ic-sitrep-tooltip__loc">
-                    {{ incidents[0]!.locationName }} · {{ incidents[0]!.sector }}
-                  </p>
-                  <p class="ic-sitrep-tooltip__meta">
-                    {{ incidents[0]!.priority }} · {{ incidents[0]!.status }} · {{ formatTime(incidents[0]!.timestamp) }}
-                  </p>
-                  <p v-if="incidents[0]!.description" class="ic-sitrep-tooltip__desc">
-                    {{ incidents[0]!.description }}
-                  </p>
-                </template>
-              </div>
-
-              <div
-                v-else-if="highlightedIncident"
-                class="ic-sitrep-tooltip"
-                role="tooltip"
-              >
-                <p class="ic-sitrep-tooltip__id">
-                  {{ highlightedIncident.incidentId }}
-                </p>
-                <p class="ic-sitrep-tooltip__type">
-                  {{ highlightedIncident.incidentTypeName }}
-                </p>
-                <p class="ic-sitrep-tooltip__loc">
-                  {{ highlightedIncident.locationName }} · {{ highlightedIncident.sector }}
-                </p>
-                <p class="ic-sitrep-tooltip__meta">
-                  {{ highlightedIncident.priority }} · {{ highlightedIncident.status }} · {{ formatTime(highlightedIncident.timestamp) }}
-                </p>
-                <p v-if="highlightedIncident.description" class="ic-sitrep-tooltip__desc">
-                  {{ highlightedIncident.description }}
-                </p>
-              </div>
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div
+      v-if="overlayMarker && overlayStyle && overlayMode"
+      class="ic-sitrep-map__overlays"
+      :class="{ 'ic-sitrep-map__overlays--below': overlayPlacement === 'below' }"
+      :style="overlayStyle"
+    >
+      <div
+        v-if="overlayMode === 'picker'"
+        class="ic-sitrep-marker-picker"
+        role="menu"
+        @click.stop
+      >
+        <p class="ic-sitrep-marker-picker__heading">
+          {{ overlayMarker.count }} incidenten · {{ overlayMarker.sector }}
+        </p>
+        <ul class="ic-sitrep-marker-picker__list">
+          <li
+            v-for="incident in overlayMarker.incidents"
+            :key="incident.incidentId"
+            role="none"
+          >
+            <button
+              type="button"
+              class="ic-sitrep-marker-picker__item"
+              role="menuitem"
+              @click.stop="onPickerSelect(incident)"
+            >
+              <span
+                :class="severityDotClass(getIncidentSeverity(incident))"
+                class="ic-sitrep-marker-picker__dot"
+                aria-hidden="true"
+              />
+              <span class="ic-sitrep-marker-picker__copy">
+                <span class="ic-sitrep-marker-picker__id">{{ incident.incidentId }}</span>
+                <span class="ic-sitrep-marker-picker__type">{{ incident.incidentTypeName }}</span>
+                <span class="ic-sitrep-marker-picker__meta">
+                  {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
+                </span>
+              </span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <div
+        v-else
+        class="ic-sitrep-tooltip"
+        :class="{
+          'ic-sitrep-tooltip--stack': overlayMarker.count > 1 && overlayMode === 'hover',
+          'ic-sitrep-tooltip--below': overlayPlacement === 'below',
+        }"
+        role="tooltip"
+      >
+        <template v-if="overlayMarker.count > 1 && overlayMode === 'hover'">
+          <p class="ic-sitrep-tooltip__heading">
+            {{ overlayMarker.count }} incidenten · {{ overlayMarker.sector }}
+          </p>
+          <div
+            v-for="incident in overlayMarker.incidents"
+            :key="incident.incidentId"
+            class="ic-sitrep-tooltip__entry"
+          >
+            <p class="ic-sitrep-tooltip__id">
+              {{ incident.incidentId }}
+            </p>
+            <p class="ic-sitrep-tooltip__type">
+              {{ incident.incidentTypeName }}
+            </p>
+            <p class="ic-sitrep-tooltip__loc">
+              {{ incident.locationName }} · {{ incident.sector }}
+            </p>
+            <p class="ic-sitrep-tooltip__meta">
+              {{ incident.priority }} · {{ incident.status }} · {{ formatTime(incident.timestamp) }}
+            </p>
+            <p v-if="incident.description" class="ic-sitrep-tooltip__desc">
+              {{ incident.description }}
+            </p>
+          </div>
+        </template>
+        <template v-else-if="overlayIncident">
+          <p class="ic-sitrep-tooltip__id">
+            {{ overlayIncident.incidentId }}
+          </p>
+          <p class="ic-sitrep-tooltip__type">
+            {{ overlayIncident.incidentTypeName }}
+          </p>
+          <p class="ic-sitrep-tooltip__loc">
+            {{ overlayIncident.locationName }} · {{ overlayMarker.sector }}
+          </p>
+          <p class="ic-sitrep-tooltip__meta">
+            {{ overlayIncident.priority }} · {{ overlayIncident.status }} · {{ formatTime(overlayIncident.timestamp) }}
+          </p>
+          <p v-if="overlayIncident.description" class="ic-sitrep-tooltip__desc">
+            {{ overlayIncident.description }}
+          </p>
+        </template>
       </div>
     </div>
   </section>
@@ -360,6 +472,7 @@ function onPickerSelect(incident: Incident) {
 .ic-sitrep-map--panel {
   display: flex;
   flex-direction: column;
+  position: relative;
   min-height: 0;
   height: 100%;
 }
@@ -372,6 +485,8 @@ function onPickerSelect(incident: Incident) {
   gap: 0.5rem 1rem;
   flex-shrink: 0;
   padding: 0.75rem 1rem 0.625rem;
+  position: relative;
+  z-index: 1;
 }
 
 .ic-sitrep-map__header-main {
@@ -430,6 +545,23 @@ function onPickerSelect(incident: Incident) {
   overflow: hidden;
   border-top: 1px solid rgb(135 161 198 / 0.2);
   background: #fff;
+  position: relative;
+  z-index: 0;
+}
+
+.ic-sitrep-map__overlays {
+  position: absolute;
+  z-index: 200;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 0.5rem));
+}
+
+.ic-sitrep-map__overlays--below {
+  transform: translate(-50%, 0.5rem);
+}
+
+.ic-sitrep-map__overlays .ic-sitrep-marker-picker {
+  pointer-events: auto;
 }
 
 .ic-sitrep-map__viewport {
@@ -598,10 +730,7 @@ function onPickerSelect(incident: Incident) {
 }
 
 .ic-sitrep-tooltip {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 20;
   width: max-content;
   max-width: 16rem;
@@ -624,6 +753,13 @@ function onPickerSelect(incident: Incident) {
   transform: translateX(-50%);
   border: 6px solid transparent;
   border-top-color: rgb(28 29 82 / 0.95);
+}
+
+.ic-sitrep-tooltip--below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: rgb(28 29 82 / 0.95);
 }
 
 .ic-sitrep-tooltip--stack {
@@ -670,10 +806,7 @@ function onPickerSelect(incident: Incident) {
 }
 
 .ic-sitrep-marker-picker {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   z-index: 30;
   width: max-content;
   max-width: min(18rem, 70vw);
