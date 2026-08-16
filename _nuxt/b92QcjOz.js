@@ -1,0 +1,1 @@
+import{e as a,h as n,o as s,c as o,i as r}from"./DQOre2D2.js";const m=a({__name:"index",async setup(c){let e,t;return[e,t]=n(()=>r("/admin/users",{replace:!0})),await e,t(),(_,i)=>(s(),o("div"))}});export{m as default};
