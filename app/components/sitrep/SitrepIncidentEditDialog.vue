@@ -30,6 +30,7 @@ const { fetchConfig, config, loading: configLoading } = useIncidents()
 const { displayName, fetchMe } = useStaffAuth()
 const { markRead } = useIncidentFeedUnread()
 const { incidents } = useSitrep()
+const { openEditIncident } = useSitrepEditIncident()
 
 const form = reactive<IncidentEditForm>({
   timestamp: '',
@@ -119,7 +120,7 @@ watch(
 
 const updatesRefreshKey = ref(0)
 
-type EditDialogTab = 'form' | 'updates'
+type EditDialogTab = 'form' | 'updates' | 'children'
 const editTab = ref<EditDialogTab>('form')
 
 const DESKTOP_FEED_MQ = '(min-width: 961px)'
@@ -148,6 +149,14 @@ watch(visible, (open) => {
     }
   }
 })
+
+watch(
+  () => props.incident?.incidentId,
+  () => {
+    editTab.value = 'form'
+    updatesRefreshKey.value += 1
+  },
+)
 
 watch(editTab, (tab) => {
   if (tab !== 'updates') {
@@ -245,6 +254,10 @@ const linkedChildren = computed(() => {
 
 const hasLinkedChildren = computed(() => linkedChildren.value.length > 0)
 
+const linkedChildrenOpenCount = computed(() =>
+  linkedChildren.value.filter(child => child.isOpen).length,
+)
+
 const parentSelectOptions = computed(() => {
   const currentId = props.incident?.incidentId
   const selectedParentId = form.parentId
@@ -268,6 +281,30 @@ const parentSelectOptions = computed(() => {
 
 const parentSelectDisabled = computed(() => hasLinkedChildren.value)
 
+const parentIncident = computed(() => {
+  const parentId = props.incident?.parentId?.trim()
+  if (!parentId) {
+    return null
+  }
+  return incidents.value.find(incident => incident.incidentId === parentId) ?? null
+})
+
+const isSubIncident = computed(() => Boolean(props.incident?.parentId?.trim()))
+
+const parentCrumbTitle = computed(() => {
+  const parent = parentIncident.value
+  if (parent) {
+    return `${parent.incidentId} · ${parent.incidentTypeName} · ${parent.locationName}`
+  }
+  return props.incident?.parentId ?? undefined
+})
+
+function openParentIncident() {
+  if (parentIncident.value) {
+    openEditIncident(parentIncident.value)
+  }
+}
+
 function formatReadOnlyTime(value?: string): string {
   if (!value) {
     return '—'
@@ -284,6 +321,20 @@ function formatReadOnlyTime(value?: string): string {
     minute: '2-digit',
   })
 }
+
+const dialogStyle = {
+  width: 'min(100vw - 2rem, 84rem)',
+  height: '90vh',
+  maxHeight: '90vh',
+} as const
+
+const dialogContentStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  flex: '1 1 auto',
+  minHeight: 0,
+  overflow: 'hidden',
+} as const
 
 function close() {
   visible.value = false
@@ -315,15 +366,49 @@ function submit() {
   <Dialog
     v-model:visible="visible"
     modal
-    :header="incident ? `${incident.incidentId} bewerken` : 'Incident'"
     class="ic-sitrep-edit-dialog"
-    :style="{ width: 'min(100vw - 2rem, 84rem)' }"
+    :class="{ 'ic-sitrep-edit-dialog--sub': isSubIncident }"
+    :style="dialogStyle"
+    :content-style="dialogContentStyle"
     :draggable="false"
     :dismissable-mask="true"
     block-scroll
     content-class="ic-sitrep-edit-dialog__content"
     @hide="close"
   >
+    <template #header>
+      <nav
+        v-if="incident && isSubIncident"
+        class="ic-sitrep-edit-dialog__crumb"
+        aria-label="Incidentgroep"
+      >
+        <button
+          v-if="parentIncident"
+          type="button"
+          class="ic-sitrep-edit-dialog__crumb-link"
+          :title="parentCrumbTitle"
+          @click="openParentIncident"
+        >
+          {{ parentIncident.incidentId }}
+        </button>
+        <span
+          v-else
+          class="ic-sitrep-edit-dialog__crumb-muted"
+          :title="parentCrumbTitle"
+        >
+          {{ incident.parentId }}
+        </span>
+        <i class="pi pi-angle-right ic-sitrep-edit-dialog__crumb-sep" aria-hidden="true" />
+        <span class="ic-sitrep-edit-dialog__crumb-current">{{ incident.incidentId }}</span>
+      </nav>
+      <span v-else-if="incident" class="ic-sitrep-edit-dialog__title">
+        {{ incident.incidentId }} bewerken
+      </span>
+      <span v-else class="ic-sitrep-edit-dialog__title">
+        Incident
+      </span>
+    </template>
+
     <template v-if="incident">
       <div v-if="configLoading && !config" class="ic-sitrep-edit-dialog__loading">
         <Message severity="info" :closable="false">
@@ -332,20 +417,31 @@ function submit() {
       </div>
 
       <div v-else class="ic-sitrep-edit-dialog__body">
-        <Tabs v-model:value="editTab" class="ic-sitrep-edit-dialog__tabs">
+        <Tabs
+          v-model:value="editTab"
+          :class="[
+            'ic-sitrep-edit-dialog__tabs',
+            { 'ic-sitrep-edit-dialog__tabs--has-children': hasLinkedChildren },
+          ]"
+        >
           <TabList>
             <Tab value="form">
               <i class="pi pi-file-edit mr-1.5" aria-hidden="true" />
               Gegevens
             </Tab>
-            <Tab value="updates">
+            <Tab v-if="hasLinkedChildren" value="children">
+              <i class="pi pi-sitemap mr-1.5" aria-hidden="true" />
+              <span class="ic-sitrep-edit-dialog__tab-label">Subtickets</span>
+              <span class="ic-sitrep-edit-dialog__tab-badge">{{ linkedChildren.length }}</span>
+            </Tab>
+            <Tab value="updates" class="ic-sitrep-edit-dialog__tab-updates">
               <i class="pi pi-comments mr-1.5" aria-hidden="true" />
               Updates
             </Tab>
           </TabList>
 
           <TabPanels :lazy="false">
-            <TabPanel value="form">
+            <TabPanel value="form" class="ic-sitrep-edit-dialog__panel-main">
               <div class="ic-sitrep-edit-dialog__form ic-form">
         <section class="ic-sitrep-edit-dialog__section">
           <h3 class="ic-sitrep-edit-dialog__heading">
@@ -606,27 +702,39 @@ function submit() {
             />
           </IcFormField>
 
-          <div v-if="hasLinkedChildren" class="ic-sitrep-edit-dialog__children">
-            <p class="ic-sitrep-edit-dialog__children-label">
-              Sub-incidenten
-            </p>
-            <ul class="ic-sitrep-edit-dialog__children-list">
-              <li
-                v-for="child in linkedChildren"
-                :key="child.incidentId"
-              >
-                <span class="ic-sitrep-edit-dialog__children-id">{{ child.incidentId }}</span>
-                <span>{{ child.incidentTypeName }}</span>
-                <span class="ic-sitrep-edit-dialog__children-status">{{ child.status || 'Open' }}</span>
-              </li>
-            </ul>
-          </div>
+          <Message
+            v-if="hasLinkedChildren"
+            severity="info"
+            :closable="false"
+            class="ic-sitrep-edit-dialog__children-hint mt-4"
+          >
+            {{ linkedChildren.length }} sub-incidenten gekoppeld
+            ({{ linkedChildrenOpenCount }} open).
+            <button
+              type="button"
+              class="ic-sitrep-edit-dialog__children-hint-link"
+              @click="editTab = 'children'"
+            >
+              Bekijk sub-incidenten
+            </button>
+          </Message>
         </section>
 
               </div>
             </TabPanel>
 
-            <TabPanel value="updates">
+            <TabPanel v-if="hasLinkedChildren" value="children" class="ic-sitrep-edit-dialog__panel-main">
+              <SitrepIncidentList
+                class="ic-sitrep-edit-dialog__sub-list"
+                :incidents="linkedChildren"
+                hide-filters
+                :show-summary="false"
+                row-variant="child"
+                empty-message="Geen sub-incidenten"
+              />
+            </TabPanel>
+
+            <TabPanel value="updates" class="ic-sitrep-edit-dialog__panel-updates">
               <aside class="ic-sitrep-edit-dialog__feed">
                 <SitrepIncidentUpdateFeed
                   :incident="incident"
@@ -641,7 +749,7 @@ function submit() {
       </div>
     </template>
 
-    <template #footer>
+    <template #footer class="mt-0 pt-0">
       <Button
         label="Annuleren"
         severity="secondary"
@@ -670,6 +778,10 @@ function submit() {
 }
 
 .ic-sitrep-edit-dialog__loading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   padding: 0.5rem 0;
 }
 
@@ -726,8 +838,32 @@ function submit() {
 }
 
 @media (min-width: 961px) {
-  .ic-sitrep-edit-dialog__tabs :deep(.p-tabpanel) {
+  .ic-sitrep-edit-dialog__tabs :deep(.ic-sitrep-edit-dialog__tab-updates) {
+    display: none;
+  }
+
+  .ic-sitrep-edit-dialog__tabs:not(.ic-sitrep-edit-dialog__tabs--has-children) :deep(.p-tabpanel) {
     display: flex !important;
+  }
+
+  .ic-sitrep-edit-dialog__tabs--has-children :deep(.p-tablist) {
+    display: flex;
+  }
+
+  .ic-sitrep-edit-dialog__tabs--has-children :deep(.ic-sitrep-edit-dialog__panel-main) {
+    display: none !important;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .ic-sitrep-edit-dialog__tabs--has-children :deep(.ic-sitrep-edit-dialog__panel-main.p-tabpanel-active) {
+    display: flex !important;
+  }
+
+  .ic-sitrep-edit-dialog__tabs--has-children :deep(.ic-sitrep-edit-dialog__panel-updates) {
+    display: flex !important;
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 
@@ -752,6 +888,60 @@ function submit() {
   overflow: hidden;
   padding: 0 0 0 1rem;
   border-left: 1px solid rgb(135 161 198 / 0.25);
+}
+
+.ic-sitrep-edit-dialog__tab-label {
+  margin-right: 0.25rem;
+}
+
+.ic-sitrep-edit-dialog__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 9999px;
+  background: rgb(45 46 126 / 0.1);
+  color: var(--ic-brand-dark);
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ic-sitrep-edit-dialog__tabs :deep(.p-tab.p-tab-active) .ic-sitrep-edit-dialog__tab-badge {
+  background: rgb(249 115 22 / 0.15);
+  color: #c2410c;
+}
+
+.ic-sitrep-edit-dialog__sub-list {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.ic-sitrep-edit-dialog__sub-list :deep(.ic-sitrep-list__scroll) {
+  padding: 0 0.5rem 0 0;
+}
+
+.ic-sitrep-edit-dialog__children-hint :deep(.p-message-text) {
+  font-size: 0.8125rem;
+}
+
+.ic-sitrep-edit-dialog__children-hint-link {
+  margin-left: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ic-brand);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ic-sitrep-edit-dialog__children-hint-link:hover {
+  color: var(--ic-brand-dark);
 }
 
 @media (max-width: 960px) {
@@ -791,6 +981,10 @@ function submit() {
   .ic-sitrep-edit-dialog__feed {
     padding: 0;
     border-left: 0;
+  }
+
+  .ic-sitrep-edit-dialog__sub-list :deep(.ic-sitrep-list__scroll) {
+    padding: 0 0.5rem;
   }
 
   .ic-sitrep-edit-dialog__feed :deep(.ic-update-feed) {
@@ -842,45 +1036,6 @@ function submit() {
   color: #334155;
 }
 
-.ic-sitrep-edit-dialog__children {
-  margin-top: 1rem;
-}
-
-.ic-sitrep-edit-dialog__children-label {
-  margin: 0 0 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b;
-}
-
-.ic-sitrep-edit-dialog__children-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.ic-sitrep-edit-dialog__children-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  color: #334155;
-}
-
-.ic-sitrep-edit-dialog__children-id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.ic-sitrep-edit-dialog__children-status {
-  color: #64748b;
-}
-
 .ic-sitrep-edit-dialog__flags {
   border: 0;
   padding: 0;
@@ -908,17 +1063,94 @@ function submit() {
 .ic-sitrep-edit-dialog__form :deep(.p-multiselect) {
   width: 100%;
 }
+
+.ic-sitrep-edit-dialog__title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ic-brand-dark);
+}
+
+.ic-sitrep-edit-dialog__crumb {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.6875rem;
+  line-height: 1.15;
+  color: #64748b;
+}
+
+.ic-sitrep-edit-dialog__crumb-link {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--ic-brand);
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ic-sitrep-edit-dialog__crumb-link:hover {
+  color: var(--ic-brand-dark);
+}
+
+.ic-sitrep-edit-dialog__crumb-link:focus-visible {
+  outline: 2px solid var(--ic-brand);
+  outline-offset: 2px;
+  border-radius: 0.125rem;
+}
+
+.ic-sitrep-edit-dialog__crumb-muted {
+  min-width: 0;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ic-sitrep-edit-dialog__crumb-sep {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  color: #94a3b8;
+}
+
+.ic-sitrep-edit-dialog__crumb-current {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--ic-brand-dark);
+}
 </style>
 
 <style>
 .ic-sitrep-edit-dialog.p-dialog {
   display: flex;
   flex-direction: column;
-  height: min(90vh, 880px);
-  max-height: min(90vh, 880px);
+  height: 90vh !important;
+  max-height: 90vh !important;
 }
 
-.ic-sitrep-edit-dialog.p-dialog .p-dialog-content {
+.ic-sitrep-edit-dialog.p-dialog .p-dialog-header {
+  flex-shrink: 0;
+}
+
+.ic-sitrep-edit-dialog.p-dialog.ic-sitrep-edit-dialog--sub .p-dialog-header {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.ic-sitrep-edit-dialog.p-dialog .p-dialog-content,
+.ic-sitrep-edit-dialog.p-dialog .ic-sitrep-edit-dialog__content {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -933,8 +1165,6 @@ function submit() {
 @media (max-width: 960px) {
   .ic-sitrep-edit-dialog.p-dialog {
     width: calc(100vw - 0.5rem) !important;
-    height: min(90vh, 900px);
-    max-height: min(90vh, 900px);
   }
 
   .ic-sitrep-edit-dialog.p-dialog .p-dialog-header {

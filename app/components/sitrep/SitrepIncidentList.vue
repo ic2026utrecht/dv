@@ -4,7 +4,23 @@ import { buildSitrepListEntries, type IncidentGroup } from '~/utils/incidentGrou
 import { DEFAULT_SITREP_LIST_FILTERS } from '~/utils/sitrepFilters'
 import { getHighestSeverity, getIncidentSeverity } from '~/utils/sitrepColors'
 
+const props = withDefaults(defineProps<{
+  /** Flat list mode: render these incidents instead of the filtered sitrep query list. */
+  incidents?: Incident[]
+  hideFilters?: boolean
+  showSummary?: boolean
+  emptyMessage?: string
+  rowVariant?: 'standalone' | 'child' | 'orphan' | 'group'
+}>(), {
+  hideFilters: false,
+  showSummary: true,
+  emptyMessage: 'Geen incidenten voor dit filter',
+  rowVariant: 'standalone',
+})
+
 const EXPANDED_STORAGE_KEY = 'sitrep-group-expanded'
+
+const useEmbeddedList = computed(() => props.incidents != null)
 
 const { incidents, updateIncident } = useSitrep()
 const { filters, filterIncidents } = useSitrepQuery()
@@ -20,11 +36,16 @@ const statusSaveError = ref<string | null>(null)
 
 const expandedOverrides = ref<Record<string, boolean>>(loadExpandedOverrides())
 
-const filteredIncidents = computed(() => filterIncidents(incidents.value))
-
-const listEntries = computed(() =>
-  buildSitrepListEntries(filteredIncidents.value, incidents.value, filters.value.sort),
+const filteredIncidents = computed(() =>
+  useEmbeddedList.value ? props.incidents! : filterIncidents(incidents.value),
 )
+
+const listEntries = computed(() => {
+  if (useEmbeddedList.value) {
+    return []
+  }
+  return buildSitrepListEntries(filteredIncidents.value, incidents.value, filters.value.sort)
+})
 
 const activeFilterCount = computed(() => {
   let count = 0
@@ -153,7 +174,7 @@ async function handleStatusSave(payload: IncidentUpdate) {
 
 <template>
   <section class="ic-sitrep-list ic-sitrep-list--panel">
-    <div class="ic-sitrep-list__controls-bar">
+    <div v-if="!hideFilters" class="ic-sitrep-list__controls-bar">
       <button
         type="button"
         class="ic-sitrep-list__filters-btn"
@@ -169,16 +190,17 @@ async function handleStatusSave(payload: IncidentUpdate) {
           {{ activeFilterCount }}
         </span>
       </button>
-      <span class="ic-sitrep-list__summary">
+      <span v-if="showSummary" class="ic-sitrep-list__summary">
         {{ filteredIncidents.length }} melding{{ filteredIncidents.length === 1 ? '' : 'en' }}
       </span>
     </div>
 
-    <div class="ic-sitrep-list__controls ic-sitrep-list__controls--desktop">
+    <div v-if="!hideFilters" class="ic-sitrep-list__controls ic-sitrep-list__controls--desktop">
       <SitrepIncidentListFilters />
     </div>
 
     <Drawer
+      v-if="!hideFilters"
       v-model:visible="filtersDrawerOpen"
       position="bottom"
       header="Filters & sorteren"
@@ -198,8 +220,23 @@ async function handleStatusSave(payload: IncidentUpdate) {
 
     <div class="ic-sitrep-list__scroll">
       <p v-if="filteredIncidents.length === 0" class="ic-sitrep-list__empty">
-        Geen incidenten voor dit filter
+        {{ emptyMessage }}
       </p>
+
+      <ul v-else-if="useEmbeddedList" class="ic-sitrep-list__items">
+        <li
+          v-for="incident in filteredIncidents"
+          :key="incident.incidentId"
+        >
+          <SitrepIncidentListRow
+            :variant="rowVariant"
+            :incident="incident"
+            :unread-count="unreadCount(incident.incidentId)"
+            @open="openIncident(incident)"
+            @status="openStatusUpdate(incident)"
+          />
+        </li>
+      </ul>
 
       <ul v-else class="ic-sitrep-list__items">
         <li
