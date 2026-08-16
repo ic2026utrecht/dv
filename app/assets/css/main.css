@@ -580,7 +580,7 @@ body {
 
 .ic-sitrep-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  grid-template-columns: minmax(0, 1fr) minmax(30rem, 36rem);
   height: 100%;
   min-height: 0;
   overflow: hidden;
