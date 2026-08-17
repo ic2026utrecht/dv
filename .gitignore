@@ -8,3 +8,8 @@ dist
 !.env.example
 *.log
 .DS_Store
+
+# Database dumps and schema (kept locally only)
+backups/
+supabase/migrations/
+data/schema.md
