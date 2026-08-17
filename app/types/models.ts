@@ -205,6 +205,7 @@ export interface Staff {
   phone: string
   pinSetAt: string | null
   isAdmin?: boolean
+  active?: boolean
   createdAt?: string
 }
 

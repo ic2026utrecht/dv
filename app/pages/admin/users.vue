@@ -5,12 +5,13 @@ import { isValidE164, isValidPin, normalizePhone, normalizePin } from '~/utils/p
 
 useHead({ title: 'Medewerkers — Admin — IC2026 DV' })
 
-const { listStaff, addStaff, updateStaff, removeStaff, fetchMe } = useStaffAuth()
+const { listStaff, addStaff, updateStaff, removeStaff, fetchMe, staff } = useStaffAuth()
 
 const rows = ref<Staff[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
+const addVisible = ref(false)
 const firstName = ref('')
 const lastName = ref('')
 const phone = ref('')
@@ -26,12 +27,21 @@ const editLast = ref('')
 const editPhone = ref('')
 const editPin = ref('')
 const editIsAdmin = ref(false)
+const editActive = ref(true)
 const savingEdit = ref(false)
 const editError = ref<string | null>(null)
 
 const confirmVisible = ref(false)
 const removeTarget = ref<Staff | null>(null)
 const removing = ref(false)
+
+function isRowActive(row: Staff): boolean {
+  return row.active !== false
+}
+
+function isSelf(row: Staff): boolean {
+  return staff.value?.id === row.id
+}
 
 async function load() {
   loading.value = true
@@ -52,6 +62,20 @@ onMounted(() => {
   load().catch(() => {})
 })
 
+function resetAddForm() {
+  firstName.value = ''
+  lastName.value = ''
+  phone.value = ''
+  pin.value = ''
+  makeAdmin.value = false
+  addError.value = null
+}
+
+function openAdd() {
+  resetAddForm()
+  addVisible.value = true
+}
+
 async function onAdd() {
   addError.value = null
   adding.value = true
@@ -63,11 +87,8 @@ async function onAdd() {
       pin: normalizePin(pin.value),
       isAdmin: makeAdmin.value,
     })
-    firstName.value = ''
-    lastName.value = ''
-    phone.value = ''
-    pin.value = ''
-    makeAdmin.value = false
+    addVisible.value = false
+    resetAddForm()
     await load()
   }
   catch (err) {
@@ -85,6 +106,7 @@ function openEdit(row: Staff) {
   editPhone.value = row.phone
   editPin.value = ''
   editIsAdmin.value = Boolean(row.isAdmin)
+  editActive.value = isRowActive(row)
   editError.value = null
   editVisible.value = true
 }
@@ -105,6 +127,11 @@ async function saveEdit() {
     return
   }
 
+  if (isSelf(editRow.value) && !editActive.value) {
+    editError.value = 'Je kunt jezelf niet deactiveren'
+    return
+  }
+
   savingEdit.value = true
   try {
     await updateStaff({
@@ -114,6 +141,7 @@ async function saveEdit() {
       phone: editPhone.value,
       pin: trimmedPin || undefined,
       isAdmin: editIsAdmin.value,
+      active: editActive.value,
     })
     editVisible.value = false
     await load()
@@ -123,6 +151,28 @@ async function saveEdit() {
   }
   finally {
     savingEdit.value = false
+  }
+}
+
+async function toggleActive(row: Staff) {
+  if (isSelf(row) && isRowActive(row)) {
+    error.value = 'Je kunt jezelf niet deactiveren'
+    return
+  }
+  error.value = null
+  try {
+    await updateStaff({
+      id: row.id,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      phone: row.phone,
+      isAdmin: Boolean(row.isAdmin),
+      active: !isRowActive(row),
+    })
+    await load()
+  }
+  catch (err) {
+    error.value = err instanceof Error ? err.message : 'Status wijzigen mislukt'
   }
 }
 
@@ -164,98 +214,28 @@ function roleLabel(row: Staff): string {
       {{ error }}
     </Message>
 
-    <section class="ic-card space-y-4">
-      <h2 class="ic-section-heading mb-0">
-        Nieuwe medewerker
-      </h2>
-      <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="onAdd">
-        <div>
-          <label class="ic-label" for="admin-first">Voornaam</label>
-          <InputText
-            id="admin-first"
-            v-model="firstName"
-            class="ic-field"
-            required
-          />
-        </div>
-        <div>
-          <label class="ic-label" for="admin-last">Achternaam</label>
-          <InputText
-            id="admin-last"
-            v-model="lastName"
-            class="ic-field"
-            required
-          />
-        </div>
-        <div class="sm:col-span-2">
-          <label class="ic-label" for="admin-phone">Telefoonnummer</label>
-          <InputText
-            id="admin-phone"
-            v-model="phone"
-            class="ic-field"
-            type="tel"
-            required
-          />
-        </div>
-        <div class="sm:col-span-2">
-          <label class="ic-label" for="admin-pin">PIN (6 cijfers)</label>
-          <p class="ic-label-hint">
-            Geef deze PIN door aan de medewerker — zij kunnen niet zelf een account maken.
-          </p>
-          <InputText
-            id="admin-pin"
-            v-model="pin"
-            class="ic-field"
-            type="password"
-            inputmode="numeric"
-            maxlength="6"
-            pattern="\d{6}"
-            required
-          />
-        </div>
-        <div class="sm:col-span-2 flex items-center gap-2">
-          <Checkbox
-            v-model="makeAdmin"
-            input-id="admin-make-admin"
-            binary
-          />
-          <label for="admin-make-admin" class="text-sm text-slate-700">
-            Admin-rechten (mag medewerkers beheren)
-          </label>
-        </div>
-        <Message
-          v-if="addError"
-          class="sm:col-span-2"
-          severity="error"
-          :closable="false"
-        >
-          {{ addError }}
-        </Message>
-        <div class="sm:col-span-2">
-          <Button
-            type="submit"
-            label="Account aanmaken"
-            icon="pi pi-plus"
-            :loading="adding"
-          />
-        </div>
-      </form>
-    </section>
-
     <section class="space-y-3">
       <div class="flex items-center justify-between gap-2">
         <h2 class="ic-section-heading mb-0">
-          Lijst
+          Medewerkers
         </h2>
-        <Button
-          icon="pi pi-refresh"
-          severity="secondary"
-          text
-          rounded
-          :loading="loading"
-          aria-label="Vernieuwen"
-          @click="load"
-        />
+        <div class="flex items-center gap-1">
+          <Button
+            icon="pi pi-refresh"
+            severity="secondary"
+            text
+            rounded
+            :loading="loading"
+            aria-label="Vernieuwen"
+            @click="load"
+          />
+          <Button
+            label="Toevoegen"
+            icon="pi pi-plus"
+            size="small"
+            @click="openAdd"
+          />
+        </div>
       </div>
 
       <div
@@ -273,6 +253,7 @@ function roleLabel(row: Staff): string {
           v-for="row in rows"
           :key="row.id"
           class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          :class="{ 'opacity-60': !isRowActive(row) }"
         >
           <div>
             <p class="font-medium text-[var(--ic-brand-dark)]">
@@ -281,6 +262,10 @@ function roleLabel(row: Staff): string {
                 v-if="row.isAdmin"
                 class="ml-2 text-xs font-semibold uppercase tracking-wide text-[var(--ic-orange)]"
               >Admin</span>
+              <span
+                v-if="!isRowActive(row)"
+                class="ml-2 text-xs font-semibold uppercase tracking-wide text-slate-500"
+              >Inactief</span>
             </p>
             <p class="text-sm text-slate-600">
               {{ row.phone }}
@@ -289,7 +274,16 @@ function roleLabel(row: Staff): string {
               {{ roleLabel(row) }} · PIN ingesteld
             </p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
+            <Button
+              :label="isRowActive(row) ? 'Deactiveren' : 'Activeren'"
+              :icon="isRowActive(row) ? 'pi pi-eye-slash' : 'pi pi-eye'"
+              size="small"
+              severity="secondary"
+              outlined
+              :disabled="isSelf(row) && isRowActive(row)"
+              @click="toggleActive(row)"
+            />
             <Button
               label="Bewerken"
               icon="pi pi-pencil"
@@ -304,6 +298,7 @@ function roleLabel(row: Staff): string {
               size="small"
               severity="danger"
               outlined
+              :disabled="isSelf(row)"
               @click="askRemove(row)"
             />
           </div>
@@ -312,11 +307,102 @@ function roleLabel(row: Staff): string {
           v-if="!rows.length"
           class="px-4 py-8 text-center text-sm text-slate-500"
         >
-          Nog geen medewerkers. Maak hierboven een account aan.
+          Nog geen medewerkers. Klik op Toevoegen om een account aan te maken.
         </li>
       </ul>
     </section>
   </div>
+
+  <Dialog
+    v-model:visible="addVisible"
+    modal
+    header="Nieuwe medewerker"
+    class="w-full max-w-md"
+    :dismissable-mask="true"
+  >
+    <form
+      id="add-staff-form"
+      class="space-y-3"
+      @submit.prevent="onAdd"
+    >
+      <div>
+        <label class="ic-label" for="admin-first">Voornaam</label>
+        <InputText
+          id="admin-first"
+          v-model="firstName"
+          class="ic-field"
+          required
+        />
+      </div>
+      <div>
+        <label class="ic-label" for="admin-last">Achternaam</label>
+        <InputText
+          id="admin-last"
+          v-model="lastName"
+          class="ic-field"
+          required
+        />
+      </div>
+      <div>
+        <label class="ic-label" for="admin-phone">Telefoonnummer</label>
+        <InputText
+          id="admin-phone"
+          v-model="phone"
+          class="ic-field"
+          type="tel"
+          required
+        />
+      </div>
+      <div>
+        <label class="ic-label" for="admin-pin">PIN (6 cijfers)</label>
+        <p class="ic-label-hint">
+          Geef deze PIN door aan de medewerker — zij kunnen niet zelf een account maken.
+        </p>
+        <InputText
+          id="admin-pin"
+          v-model="pin"
+          class="ic-field"
+          type="password"
+          inputmode="numeric"
+          maxlength="6"
+          pattern="\d{6}"
+          required
+        />
+      </div>
+      <div class="flex items-center gap-2">
+        <Checkbox
+          v-model="makeAdmin"
+          input-id="admin-make-admin"
+          binary
+        />
+        <label for="admin-make-admin" class="text-sm text-slate-700">
+          Admin-rechten (mag medewerkers beheren)
+        </label>
+      </div>
+      <Message
+        v-if="addError"
+        severity="error"
+        :closable="false"
+      >
+        {{ addError }}
+      </Message>
+    </form>
+    <template #footer>
+      <Button
+        label="Annuleren"
+        severity="secondary"
+        text
+        @click="addVisible = false"
+      />
+      <Button
+        type="submit"
+        form="add-staff-form"
+        label="Account aanmaken"
+        icon="pi pi-plus"
+        :loading="adding"
+      />
+    </template>
+  </Dialog>
 
   <Dialog
     v-model:visible="editVisible"
@@ -375,6 +461,17 @@ function roleLabel(row: Staff): string {
         />
         <label for="edit-is-admin" class="text-sm text-slate-700">
           Admin-rechten
+        </label>
+      </div>
+      <div class="flex items-center gap-2">
+        <Checkbox
+          v-model="editActive"
+          input-id="edit-is-active"
+          binary
+          :disabled="Boolean(editRow && isSelf(editRow))"
+        />
+        <label for="edit-is-active" class="text-sm text-slate-700">
+          Actief (mag inloggen)
         </label>
       </div>
       <Message

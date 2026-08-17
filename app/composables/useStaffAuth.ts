@@ -158,6 +158,7 @@ export function useStaffAuth() {
     phone: string
     pin: string
     isAdmin?: boolean
+    active?: boolean
   }) {
     if (!isValidPin(normalizePin(payload.pin))) throw new Error('PIN moet 6 cijfers zijn')
     const result = await callStaffAuth({
@@ -167,6 +168,7 @@ export function useStaffAuth() {
       phone: normalizePhone(payload.phone),
       pin: normalizePin(payload.pin),
       isAdmin: Boolean(payload.isAdmin),
+      active: payload.active !== false,
     }, true)
     return result.data as Staff
   }
@@ -178,6 +180,7 @@ export function useStaffAuth() {
     phone?: string
     pin?: string
     isAdmin?: boolean
+    active?: boolean
   }) {
     const body: Record<string, unknown> = {
       action: 'update-staff',
@@ -189,6 +192,9 @@ export function useStaffAuth() {
     }
     if (payload.phone !== undefined) {
       body.phone = normalizePhone(payload.phone)
+    }
+    if (payload.active !== undefined) {
+      body.active = payload.active
     }
     const result = await callStaffAuth(body, true)
     const updated = result.data as Staff

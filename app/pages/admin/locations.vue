@@ -17,6 +17,7 @@ const name = ref('')
 const zone = ref('hal')
 const active = ref(true)
 const addRanges = ref<SectorRange[]>([])
+const addVisible = ref(false)
 const adding = ref(false)
 const addError = ref<string | null>(null)
 
@@ -99,6 +100,19 @@ onMounted(() => {
   load().catch(() => {})
 })
 
+function resetAddForm() {
+  name.value = ''
+  zone.value = 'hal'
+  active.value = true
+  addRanges.value = []
+  addError.value = null
+}
+
+function openAdd() {
+  resetAddForm()
+  addVisible.value = true
+}
+
 async function onAdd() {
   addError.value = null
   adding.value = true
@@ -109,10 +123,8 @@ async function onAdd() {
       active: active.value,
       sectorRanges: addRanges.value,
     })
-    name.value = ''
-    zone.value = 'hal'
-    active.value = true
-    addRanges.value = []
+    addVisible.value = false
+    resetAddForm()
     await load()
     await refreshIncidentConfig()
   }
@@ -187,132 +199,28 @@ async function toggleActive(row: Location) {
       {{ error }}
     </Message>
 
-    <section class="ic-card space-y-4">
-      <h2 class="ic-section-heading mb-0">
-        Nieuwe locatie
-      </h2>
-      <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="onAdd">
-        <div class="sm:col-span-2">
-          <label class="ic-label" for="loc-name">Naam</label>
-          <InputText
-            id="loc-name"
-            v-model="name"
-            class="ic-field"
-            placeholder="bijv. Hal 12 (NL)"
-            required
-          />
-        </div>
-        <div>
-          <label class="ic-label" for="loc-zone">Zone</label>
-          <Select
-            id="loc-zone"
-            v-model="zone"
-            :options="zoneOptions"
-            option-label="label"
-            option-value="value"
-            class="ic-field w-full"
-          />
-        </div>
-        <div class="flex items-end pb-1">
-          <div class="flex items-center gap-2">
-            <Checkbox
-              v-model="active"
-              input-id="loc-active"
-              binary
-            />
-            <label for="loc-active" class="text-sm text-slate-700">
-              Actief (zichtbaar in formulieren)
-            </label>
-          </div>
-        </div>
-
-        <div class="sm:col-span-2 space-y-2">
-          <div class="flex items-center justify-between gap-2">
-            <label class="ic-label mb-0">Sectorbereiken</label>
-            <Button
-              type="button"
-              label="Bereik toevoegen"
-              icon="pi pi-plus"
-              size="small"
-              severity="secondary"
-              outlined
-              @click="addRanges.push(emptyRange())"
-            />
-          </div>
-          <p class="text-xs text-slate-500">
-            Hoeken van een rechthoek op het raster, bijv. A1 tot C8 (= 24 sectoren). Leeg = alle sectoren.
-          </p>
-          <div
-            v-for="(range, index) in addRanges"
-            :key="`add-range-${index}`"
-            class="flex flex-wrap items-end gap-2"
-          >
-            <div class="min-w-[5.5rem] flex-1">
-              <label class="ic-label" :for="`add-from-${index}`">Van</label>
-              <InputText
-                :id="`add-from-${index}`"
-                v-model="range.from"
-                class="ic-field"
-                placeholder="A1"
-              />
-            </div>
-            <div class="min-w-[5.5rem] flex-1">
-              <label class="ic-label" :for="`add-to-${index}`">Tot</label>
-              <InputText
-                :id="`add-to-${index}`"
-                v-model="range.to"
-                class="ic-field"
-                placeholder="C8"
-              />
-            </div>
-            <Button
-              type="button"
-              icon="pi pi-trash"
-              severity="danger"
-              text
-              rounded
-              aria-label="Bereik verwijderen"
-              @click="addRanges.splice(index, 1)"
-            />
-          </div>
-          <p class="text-sm font-medium text-slate-600">
-            {{ addRangePreview }}
-          </p>
-        </div>
-
-        <Message
-          v-if="addError"
-          class="sm:col-span-2"
-          severity="error"
-          :closable="false"
-        >
-          {{ addError }}
-        </Message>
-        <div class="sm:col-span-2">
-          <Button
-            type="submit"
-            label="Locatie toevoegen"
-            icon="pi pi-plus"
-            :loading="adding"
-          />
-        </div>
-      </form>
-    </section>
-
     <section class="space-y-3">
       <div class="flex items-center justify-between gap-2">
         <h2 class="ic-section-heading mb-0">
-          Lijst
+          Locaties
         </h2>
-        <Button
-          icon="pi pi-refresh"
-          severity="secondary"
-          text
-          rounded
-          :loading="loading"
-          aria-label="Vernieuwen"
-          @click="load"
-        />
+        <div class="flex items-center gap-1">
+          <Button
+            icon="pi pi-refresh"
+            severity="secondary"
+            text
+            rounded
+            :loading="loading"
+            aria-label="Vernieuwen"
+            @click="load"
+          />
+          <Button
+            label="Toevoegen"
+            icon="pi pi-plus"
+            size="small"
+            @click="openAdd"
+          />
+        </div>
       </div>
 
       <div
@@ -373,11 +281,134 @@ async function toggleActive(row: Location) {
           v-if="!rows.length"
           class="px-4 py-8 text-center text-sm text-slate-500"
         >
-          Nog geen locaties. Voeg hierboven een locatie toe.
+          Nog geen locaties. Klik op Toevoegen om een locatie aan te maken.
         </li>
       </ul>
     </section>
   </div>
+
+  <Dialog
+    v-model:visible="addVisible"
+    modal
+    header="Nieuwe locatie"
+    class="w-full max-w-md"
+    :dismissable-mask="true"
+  >
+    <form
+      id="add-location-form"
+      class="space-y-3"
+      @submit.prevent="onAdd"
+    >
+      <div>
+        <label class="ic-label" for="loc-name">Naam</label>
+        <InputText
+          id="loc-name"
+          v-model="name"
+          class="ic-field"
+          placeholder="bijv. Hal 12 (NL)"
+          required
+        />
+      </div>
+      <div>
+        <label class="ic-label" for="loc-zone">Zone</label>
+        <Select
+          id="loc-zone"
+          v-model="zone"
+          :options="zoneOptions"
+          option-label="label"
+          option-value="value"
+          class="ic-field w-full"
+        />
+      </div>
+      <div class="flex items-center gap-2">
+        <Checkbox
+          v-model="active"
+          input-id="loc-active"
+          binary
+        />
+        <label for="loc-active" class="text-sm text-slate-700">
+          Actief (zichtbaar in formulieren)
+        </label>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <label class="ic-label mb-0">Sectorbereiken</label>
+          <Button
+            type="button"
+            label="Bereik toevoegen"
+            icon="pi pi-plus"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="addRanges.push(emptyRange())"
+          />
+        </div>
+        <p class="text-xs text-slate-500">
+          Hoeken van een rechthoek op het raster, bijv. A1 tot C8 (= 24 sectoren). Leeg = alle sectoren.
+        </p>
+        <div
+          v-for="(range, index) in addRanges"
+          :key="`add-range-${index}`"
+          class="flex flex-wrap items-end gap-2"
+        >
+          <div class="min-w-[5.5rem] flex-1">
+            <label class="ic-label" :for="`add-from-${index}`">Van</label>
+            <InputText
+              :id="`add-from-${index}`"
+              v-model="range.from"
+              class="ic-field"
+              placeholder="A1"
+            />
+          </div>
+          <div class="min-w-[5.5rem] flex-1">
+            <label class="ic-label" :for="`add-to-${index}`">Tot</label>
+            <InputText
+              :id="`add-to-${index}`"
+              v-model="range.to"
+              class="ic-field"
+              placeholder="C8"
+            />
+          </div>
+          <Button
+            type="button"
+            icon="pi pi-trash"
+            severity="danger"
+            text
+            rounded
+            aria-label="Bereik verwijderen"
+            @click="addRanges.splice(index, 1)"
+          />
+        </div>
+        <p class="text-sm font-medium text-slate-600">
+          {{ addRangePreview }}
+        </p>
+      </div>
+
+      <Message
+        v-if="addError"
+        severity="error"
+        :closable="false"
+      >
+        {{ addError }}
+      </Message>
+    </form>
+    <template #footer>
+      <Button
+        label="Annuleren"
+        severity="secondary"
+        text
+        @click="addVisible = false"
+      />
+      <Button
+        type="submit"
+        form="add-location-form"
+        label="Locatie toevoegen"
+        icon="pi pi-plus"
+        :loading="adding"
+      />
+    </template>
+  </Dialog>
 
   <Dialog
     v-model:visible="editVisible"

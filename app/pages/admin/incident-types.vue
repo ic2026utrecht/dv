@@ -19,6 +19,7 @@ const error = ref<string | null>(null)
 const name = ref('')
 const department = ref<Department>('Dienstverlening')
 const active = ref(true)
+const addVisible = ref(false)
 const adding = ref(false)
 const addError = ref<string | null>(null)
 
@@ -55,6 +56,18 @@ onMounted(() => {
   load().catch(() => {})
 })
 
+function resetAddForm() {
+  name.value = ''
+  department.value = 'Dienstverlening'
+  active.value = true
+  addError.value = null
+}
+
+function openAdd() {
+  resetAddForm()
+  addVisible.value = true
+}
+
 async function onAdd() {
   addError.value = null
   adding.value = true
@@ -64,9 +77,8 @@ async function onAdd() {
       department: department.value,
       active: active.value,
     })
-    name.value = ''
-    department.value = 'Dienstverlening'
-    active.value = true
+    addVisible.value = false
+    resetAddForm()
     await load()
     await refreshIncidentConfig()
   }
@@ -138,77 +150,28 @@ async function toggleActive(row: AdminIncidentType) {
       {{ error }}
     </Message>
 
-    <section class="ic-card space-y-4">
-      <h2 class="ic-section-heading mb-0">
-        Nieuw incidenttype
-      </h2>
-      <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="onAdd">
-        <div class="sm:col-span-2">
-          <label class="ic-label" for="type-name">Naam</label>
-          <InputText
-            id="type-name"
-            v-model="name"
-            class="ic-field"
-            placeholder="bijv. Brand/ Rook"
-            required
-          />
-        </div>
-        <div>
-          <label class="ic-label" for="type-department">Afdeling</label>
-          <Select
-            id="type-department"
-            v-model="department"
-            :options="departmentOptions"
-            option-label="label"
-            option-value="value"
-            class="ic-field w-full"
-          />
-        </div>
-        <div class="flex items-end pb-1">
-          <div class="flex items-center gap-2">
-            <Checkbox
-              v-model="active"
-              input-id="type-active"
-              binary
-            />
-            <label for="type-active" class="text-sm text-slate-700">
-              Actief (zichtbaar in formulieren)
-            </label>
-          </div>
-        </div>
-        <Message
-          v-if="addError"
-          class="sm:col-span-2"
-          severity="error"
-          :closable="false"
-        >
-          {{ addError }}
-        </Message>
-        <div class="sm:col-span-2">
-          <Button
-            type="submit"
-            label="Incidenttype toevoegen"
-            icon="pi pi-plus"
-            :loading="adding"
-          />
-        </div>
-      </form>
-    </section>
-
     <section class="space-y-3">
       <div class="flex items-center justify-between gap-2">
         <h2 class="ic-section-heading mb-0">
-          Lijst
+          Incidenttypes
         </h2>
-        <Button
-          icon="pi pi-refresh"
-          severity="secondary"
-          text
-          rounded
-          :loading="loading"
-          aria-label="Vernieuwen"
-          @click="load"
-        />
+        <div class="flex items-center gap-1">
+          <Button
+            icon="pi pi-refresh"
+            severity="secondary"
+            text
+            rounded
+            :loading="loading"
+            aria-label="Vernieuwen"
+            @click="load"
+          />
+          <Button
+            label="Toevoegen"
+            icon="pi pi-plus"
+            size="small"
+            @click="openAdd"
+          />
+        </div>
       </div>
 
       <div
@@ -266,11 +229,79 @@ async function toggleActive(row: AdminIncidentType) {
           v-if="!rows.length"
           class="px-4 py-8 text-center text-sm text-slate-500"
         >
-          Nog geen incidenttypes. Voeg hierboven een type toe.
+          Nog geen incidenttypes. Klik op Toevoegen om een type aan te maken.
         </li>
       </ul>
     </section>
   </div>
+
+  <Dialog
+    v-model:visible="addVisible"
+    modal
+    header="Nieuw incidenttype"
+    class="w-full max-w-md"
+    :dismissable-mask="true"
+  >
+    <form
+      id="add-incident-type-form"
+      class="space-y-3"
+      @submit.prevent="onAdd"
+    >
+      <div>
+        <label class="ic-label" for="type-name">Naam</label>
+        <InputText
+          id="type-name"
+          v-model="name"
+          class="ic-field"
+          placeholder="bijv. Brand/ Rook"
+          required
+        />
+      </div>
+      <div>
+        <label class="ic-label" for="type-department">Afdeling</label>
+        <Select
+          id="type-department"
+          v-model="department"
+          :options="departmentOptions"
+          option-label="label"
+          option-value="value"
+          class="ic-field w-full"
+        />
+      </div>
+      <div class="flex items-center gap-2">
+        <Checkbox
+          v-model="active"
+          input-id="type-active"
+          binary
+        />
+        <label for="type-active" class="text-sm text-slate-700">
+          Actief (zichtbaar in formulieren)
+        </label>
+      </div>
+      <Message
+        v-if="addError"
+        severity="error"
+        :closable="false"
+      >
+        {{ addError }}
+      </Message>
+    </form>
+    <template #footer>
+      <Button
+        label="Annuleren"
+        severity="secondary"
+        text
+        @click="addVisible = false"
+      />
+      <Button
+        type="submit"
+        form="add-incident-type-form"
+        label="Incidenttype toevoegen"
+        icon="pi pi-plus"
+        :loading="adding"
+      />
+    </template>
+  </Dialog>
 
   <Dialog
     v-model:visible="editVisible"

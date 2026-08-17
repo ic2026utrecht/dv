@@ -19,6 +19,7 @@ interface StaffRow {
   phone: string
   auth_user_id: string | null
   is_admin: boolean
+  active?: boolean
 }
 
 async function requireUser(req: Request) {
@@ -47,6 +48,9 @@ async function requireStaff(req: Request) {
 
   if (error) throw new Error(error.message)
   if (!staff) return { error: errorResponse('Geen staff-profiel gevonden', 404) }
+  if (staff.active === false) {
+    return { error: errorResponse('Dit account is gedeactiveerd', 403) }
+  }
 
   return { ...auth, staff: staff as StaffRow }
 }

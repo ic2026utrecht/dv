@@ -19,7 +19,30 @@ interface StaffRow {
   auth_user_id: string | null
   pin_set_at: string | null
   is_admin: boolean
+  active: boolean
   created_at: string
+}
+
+function isStaffActive(row: { active?: boolean | null }): boolean {
+  return row.active !== false
+}
+
+function inactiveAccountError() {
+  return errorResponse('Dit account is gedeactiveerd', 403)
+}
+
+async function setAuthBanned(
+  service: ReturnType<typeof getServiceClient>,
+  userId: string | null,
+  banned: boolean,
+) {
+  if (!userId) return
+  const { error } = await service.auth.admin.updateUserById(userId, {
+    ban_duration: banned ? '876000h' : 'none',
+  })
+  if (error) {
+    console.error('[staff-auth] ban_duration', error.message)
+  }
 }
 
 function getServiceClient() {
@@ -70,6 +93,9 @@ async function requireAdmin(req: Request) {
 
   if (error) throw new Error(error.message)
   if (!staff) return { error: errorResponse('Geen staff-profiel gevonden', 404) }
+  if (!isStaffActive(staff)) {
+    return { error: inactiveAccountError() }
+  }
   if (!staff.is_admin) {
     return { error: errorResponse('Alleen admins mogen dit doen', 403) }
   }
@@ -85,12 +111,13 @@ function mapStaff(row: StaffRow) {
     phone: row.phone,
     pinSetAt: row.pin_set_at,
     isAdmin: Boolean(row.is_admin),
+    active: isStaffActive(row),
     createdAt: row.created_at,
   }
 }
 
 const STAFF_SELECT =
-  'id, first_name, last_name, phone, pin_set_at, created_at, auth_user_id, is_admin'
+  'id, first_name, last_name, phone, pin_set_at, created_at, auth_user_id, is_admin, active'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -147,13 +174,16 @@ async function handleCheck(body: Record<string, unknown>) {
   const service = getServiceClient()
   const { data, error } = await service
     .from('staff')
-    .select('id, pin_set_at, first_name, last_name')
+    .select('id, pin_set_at, first_name, last_name, active')
     .eq('phone', phone)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
   if (!data) {
     return errorResponse('Dit nummer staat niet op de toeganglijst', 403)
+  }
+  if (!isStaffActive(data)) {
+    return inactiveAccountError()
   }
   if (!data.pin_set_at) {
     return errorResponse(
@@ -184,6 +214,9 @@ async function handleLogin(body: Record<string, unknown>) {
 
   if (staffError) throw new Error(staffError.message)
   if (!staff) return errorResponse('Dit nummer staat niet op de toeganglijst', 403)
+  if (!isStaffActive(staff)) {
+    return inactiveAccountError()
+  }
   if (!staff.pin_set_at) {
     return errorResponse(
       'Nog geen PIN ingesteld. Vraag een admin om je account aan te maken.',
@@ -226,6 +259,9 @@ async function handleChangePin(req: Request, body: Record<string, unknown>) {
 
   if (staffError) throw new Error(staffError.message)
   if (!staff) return errorResponse('Geen staff-profiel gevonden', 404)
+  if (!isStaffActive(staff)) {
+    return inactiveAccountError()
+  }
 
   const anon = getAnonClient()
   const { error: verifyError } = await anon.auth.signInWithPassword({
@@ -310,6 +346,7 @@ async function handleAddStaff(req: Request, body: Record<string, unknown>) {
       auth_user_id: created.user.id,
       pin_set_at: new Date().toISOString(),
       is_admin: isAdmin,
+      active: true,
     })
     .select(STAFF_SELECT)
     .single()
@@ -346,6 +383,9 @@ async function handleUpdateStaff(req: Request, body: Record<string, unknown>) {
 
   if (actorError) throw new Error(actorError.message)
   if (!actor) return errorResponse('Geen staff-profiel gevonden', 404)
+  if (!isStaffActive(actor)) {
+    return inactiveAccountError()
+  }
 
   const { data: target, error: targetError } = await service
     .from('staff')
@@ -387,6 +427,14 @@ async function handleUpdateStaff(req: Request, body: Record<string, unknown>) {
     updates.is_admin = body.isAdmin
   }
 
+  // Only admins can deactivate; cannot deactivate yourself
+  if (actor.is_admin && typeof body.active === 'boolean') {
+    if (isOwn && body.active === false) {
+      return errorResponse('Je kunt jezelf niet deactiveren')
+    }
+    updates.active = body.active
+  }
+
   if (body.phone !== undefined && body.phone !== null && String(body.phone).trim() !== '') {
     if (!actor.is_admin) {
       return errorResponse('Alleen admins mogen het telefoonnummer wijzigen', 403)
@@ -422,6 +470,10 @@ async function handleUpdateStaff(req: Request, body: Record<string, unknown>) {
     .single()
 
   if (error) throw new Error(error.message)
+
+  if (typeof updates.active === 'boolean' && updates.active !== isStaffActive(target)) {
+    await setAuthBanned(service, target.auth_user_id, updates.active === false)
+  }
 
   return jsonResponse({ data: mapStaff(data as StaffRow) })
 }
@@ -473,6 +525,9 @@ async function handleMe(req: Request) {
 
   if (error) throw new Error(error.message)
   if (!data) return errorResponse('Geen staff-profiel gevonden', 404)
+  if (!isStaffActive(data)) {
+    return inactiveAccountError()
+  }
 
   return jsonResponse({ data: mapStaff(data as StaffRow) })
 }
