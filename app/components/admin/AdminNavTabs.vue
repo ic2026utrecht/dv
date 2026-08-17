@@ -5,6 +5,7 @@ const tabs = [
   { to: '/admin/users', label: 'Medewerkers', icon: 'pi-users' },
   { to: '/admin/locations', label: 'Locaties', icon: 'pi-map-marker' },
   { to: '/admin/incident-types', label: 'Incidenttypes', icon: 'pi-list' },
+  { to: '/admin/export', label: 'Export', icon: 'pi-download' },
 ] as const
 
 function isActive(to: string): boolean {
@@ -30,6 +31,7 @@ function isActive(to: string): boolean {
 <style scoped>
 .ic-admin-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.375rem;
   padding: 0 1.25rem;
   border-bottom: 1px solid rgb(135 161 198 / 0.35);

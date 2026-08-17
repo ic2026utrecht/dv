@@ -9,7 +9,7 @@ useHead({ title: 'Admin — IC2026 DV' })
     <div class="ic-shell">
       <PageHeader
         title="Admin"
-        subtitle="Beheer medewerkers, locaties en incidenttypes"
+        subtitle="Beheer medewerkers, locaties, incidenttypes en data-export"
       />
       <AdminNavTabs />
       <NuxtPage />
