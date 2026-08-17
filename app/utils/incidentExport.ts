@@ -41,6 +41,12 @@ export function incidentIdNumber(incidentId: string): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null
 }
 
+export interface IncidentExportIndexRow {
+  incident_id: string
+  priority: Priority
+  parent_id: string | null
+}
+
 export function matchesIncidentExportFilters(
   incidentId: string,
   priority: string,
@@ -66,6 +72,34 @@ export function matchesIncidentExportFilters(
     return false
   }
   return true
+}
+
+export function matchedExportIncidentIds(
+  rows: Array<{ incident_id: string, priority: string }>,
+  filters: IncidentExportFilters,
+): Set<string> {
+  const matched = new Set<string>()
+  for (const row of rows) {
+    if (matchesIncidentExportFilters(row.incident_id, row.priority, filters)) {
+      matched.add(row.incident_id)
+    }
+  }
+  return matched
+}
+
+/** Filter matches plus every sub-incident of a matched parent. */
+export function expandExportIncidentIds(
+  rows: Array<{ incident_id: string, priority: string, parent_id?: string | null }>,
+  filters: IncidentExportFilters,
+): Set<string> {
+  const selected = matchedExportIncidentIds(rows, filters)
+  for (const row of rows) {
+    const parentId = String(row.parent_id ?? '').trim()
+    if (parentId && selected.has(parentId) && row.incident_id) {
+      selected.add(row.incident_id)
+    }
+  }
+  return selected
 }
 
 export function splitHelpOptionIds(value: unknown): string[] {
@@ -187,6 +221,167 @@ export function groupBy(rows: JsonRecord[], key: string): Map<string, JsonRecord
   return map
 }
 
+function asTrimmedString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  return String(value).trim()
+}
+
+function asNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function payloadObject(update: JsonRecord): Record<string, unknown> {
+  const payload = update.payload
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    return payload as Record<string, unknown>
+  }
+  return {}
+}
+
+export interface ExportLocationSnapshot {
+  location_id: string
+  location_name: string
+  zone: string
+  sector_row: string
+  sector_column: number | null
+  sector_label: string
+  sector: string
+  latitude: number | null
+  longitude: number | null
+}
+
+function emptyLocationSnapshot(): ExportLocationSnapshot {
+  return {
+    location_id: '',
+    location_name: '',
+    zone: '',
+    sector_row: '',
+    sector_column: null,
+    sector_label: '',
+    sector: '',
+    latitude: null,
+    longitude: null,
+  }
+}
+
+function decorateLocationSnapshot(
+  snapshot: ExportLocationSnapshot,
+  locations: Map<string, JsonRecord>,
+): ExportLocationSnapshot {
+  const location = locations.get(snapshot.location_id)
+  return {
+    ...snapshot,
+    location_name: location ? asTrimmedString(location.name) : snapshot.location_id,
+    zone: location ? asTrimmedString(location.zone) : '',
+    sector: formatIncidentSector({
+      sector_row: snapshot.sector_row,
+      sector_column: snapshot.sector_column,
+      sector_label: snapshot.sector_label,
+    }),
+  }
+}
+
+function applyLocationPayload(
+  previous: ExportLocationSnapshot,
+  payload: Record<string, unknown>,
+  locations: Map<string, JsonRecord>,
+): ExportLocationSnapshot {
+  const next = { ...previous }
+
+  if ('locationId' in payload) {
+    next.location_id = asTrimmedString(payload.locationId)
+  }
+  if ('sectorRow' in payload) {
+    next.sector_row = asTrimmedString(payload.sectorRow)
+  }
+  if ('sectorColumn' in payload) {
+    next.sector_column = asNumberOrNull(payload.sectorColumn)
+  }
+  if ('sectorLabel' in payload) {
+    next.sector_label = asTrimmedString(payload.sectorLabel)
+  }
+  if ('latitude' in payload) {
+    next.latitude = asNumberOrNull(payload.latitude)
+  }
+  if ('longitude' in payload) {
+    next.longitude = asNumberOrNull(payload.longitude)
+  }
+
+  return decorateLocationSnapshot(next, locations)
+}
+
+function locationSnapshotsEqual(a: ExportLocationSnapshot, b: ExportLocationSnapshot): boolean {
+  return (
+    a.location_id === b.location_id
+    && a.sector_row === b.sector_row
+    && a.sector_column === b.sector_column
+    && a.sector_label === b.sector_label
+    && a.latitude === b.latitude
+    && a.longitude === b.longitude
+  )
+}
+
+function sortUpdates(updates: JsonRecord[]): JsonRecord[] {
+  return [...updates].sort((a, b) => {
+    const created = asTrimmedString(a.created_at).localeCompare(asTrimmedString(b.created_at))
+    if (created !== 0) {
+      return created
+    }
+    return asTrimmedString(a.id).localeCompare(asTrimmedString(b.id))
+  })
+}
+
+export function buildLocationHistory(
+  incidentId: string,
+  updates: JsonRecord[],
+  locations: Map<string, JsonRecord>,
+): {
+  updates: JsonRecord[]
+  location_updates: JsonRecord[]
+} {
+  const sorted = sortUpdates(updates)
+  let previous = emptyLocationSnapshot()
+  const locationUpdates: JsonRecord[] = []
+
+  const annotated = sorted.map((update, index) => {
+    const current = applyLocationPayload(previous, payloadObject(update), locations)
+    const changed = !locationSnapshotsEqual(previous, current)
+    const locationChange = index > 0 && changed
+      ? { from: previous, to: current }
+      : null
+
+    if (index === 0 || locationChange) {
+      locationUpdates.push({
+        incident_id: incidentId,
+        incident_update_id: update.id ?? null,
+        created_at: update.created_at ?? null,
+        updated_by: update.updated_by ?? '',
+        initial: index === 0,
+        from: index === 0 ? null : previous,
+        to: current,
+      })
+    }
+
+    previous = current
+    return {
+      ...update,
+      location: current,
+      location_change: locationChange,
+    }
+  })
+
+  return {
+    updates: annotated,
+    location_updates: locationUpdates,
+  }
+}
+
 function relatedIncidentSummary(
   incident: JsonRecord | undefined,
   locations: Map<string, JsonRecord>,
@@ -208,6 +403,7 @@ function relatedIncidentSummary(
 
 export function buildIncidentExportJson(input: {
   filters: IncidentExportFilters
+  matchedIds: Set<string>
   incidents: JsonRecord[]
   relatedIncidents: JsonRecord[]
   locations: JsonRecord[]
@@ -229,11 +425,18 @@ export function buildIncidentExportJson(input: {
   const actionsByIncident = groupBy(input.whatsappActions, 'incident_id')
   const messages = byId(input.whatsappMessages)
   const groups = byId(input.whatsappGroups, 'group_jid')
+  const allLocationUpdates: JsonRecord[] = []
 
   const nestedIncidents = input.incidents.map((incident) => {
     const incidentId = String(incident.incident_id ?? '')
     const parentId = String(incident.parent_id ?? '').trim()
     const helpIds = splitHelpOptionIds(incident.help_option_ids)
+    const history = buildLocationHistory(
+      incidentId,
+      updatesByIncident.get(incidentId) ?? [],
+      locations,
+    )
+    allLocationUpdates.push(...history.location_updates)
 
     const whatsappMessages = (actionsByIncident.get(incidentId) ?? []).map((action) => {
       const message = messages.get(String(action.message_id ?? ''))
@@ -247,6 +450,7 @@ export function buildIncidentExportJson(input: {
 
     return {
       ...incident,
+      included_because: input.matchedIds.has(incidentId) ? 'filter' : 'subincident',
       sector: formatIncidentSector(incident),
       location: locations.get(String(incident.location_id ?? '')) ?? null,
       incident_type: types.get(String(incident.incident_type_id ?? '')) ?? null,
@@ -259,7 +463,8 @@ export function buildIncidentExportJson(input: {
       children: (childrenByParent.get(incidentId) ?? [])
         .map(child => relatedIncidentSummary(child, locations, types, helpOptions))
         .filter((row): row is JsonRecord => Boolean(row)),
-      updates: updatesByIncident.get(incidentId) ?? [],
+      updates: history.updates,
+      location_updates: history.location_updates,
       status_updates: statusByIncident.get(incidentId) ?? [],
       whatsapp_messages: whatsappMessages,
     }
@@ -277,7 +482,10 @@ export function buildIncidentExportJson(input: {
       },
       counts: {
         incidents: input.incidents.length,
+        matched_by_filter: input.matchedIds.size,
+        sub_incidents_added: Math.max(0, input.incidents.length - input.matchedIds.size),
         incident_updates: input.updates.length,
+        location_updates: allLocationUpdates.length,
         incident_status_updates: input.statusUpdates.length,
         whatsapp_messages: input.whatsappMessages.length,
         whatsapp_message_actions: input.whatsappActions.length,
@@ -291,6 +499,7 @@ export function buildIncidentExportJson(input: {
     tables: {
       incidents: input.incidents,
       incident_updates: input.updates,
+      location_updates: allLocationUpdates,
       incident_status_updates: input.statusUpdates,
       locations: input.locations,
       incident_types: input.incidentTypes,

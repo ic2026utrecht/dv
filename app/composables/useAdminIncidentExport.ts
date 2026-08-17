@@ -3,12 +3,14 @@ import {
   buildIncidentExportJson,
   byId,
   downloadTextFile,
+  expandExportIncidentIds,
   exportFilename,
   flattenIncidentForCsv,
   incidentsToCsv,
-  matchesIncidentExportFilters,
+  matchedExportIncidentIds,
   splitHelpOptionIds,
   type IncidentExportFilters,
+  type IncidentExportIndexRow,
   type JsonRecord,
 } from '~/utils/incidentExport'
 
@@ -61,29 +63,29 @@ async function fetchInChunks(
 export function useAdminIncidentExport() {
   const supabase = useSupabaseClient()
 
-  async function listIncidentIndex(): Promise<Array<{ incident_id: string, priority: Priority }>> {
+  async function listIncidentIndex(): Promise<IncidentExportIndexRow[]> {
     const rows = await fetchPaged(() =>
       supabase
         .from('incidents')
-        .select('incident_id, priority')
+        .select('incident_id, priority, parent_id')
         .order('incident_id', { ascending: true }) as unknown as PagedQuery,
     )
 
     return rows.map(row => ({
       incident_id: String(row.incident_id ?? ''),
       priority: row.priority as Priority,
+      parent_id: String(row.parent_id ?? '').trim() || null,
     }))
   }
 
   async function exportIncidents(filters: IncidentExportFilters, format: 'csv' | 'json'): Promise<number> {
     const [incidentRows, locations, incidentTypes, helpOptions] = await Promise.all([
-      fetchPaged(() => {
-        let query = supabase.from('incidents').select('*').order('incident_id', { ascending: true })
-        if (filters.priorities.length) {
-          query = query.in('priority', filters.priorities)
-        }
-        return query as unknown as PagedQuery
-      }),
+      fetchPaged(() =>
+        supabase
+          .from('incidents')
+          .select('*')
+          .order('incident_id', { ascending: true }) as unknown as PagedQuery,
+      ),
       fetchPaged(() =>
         supabase.from('locations').select('*').order('name') as unknown as PagedQuery,
       ),
@@ -95,13 +97,14 @@ export function useAdminIncidentExport() {
       ),
     ])
 
-    const incidents = incidentRows.filter(row =>
-      matchesIncidentExportFilters(
-        String(row.incident_id ?? ''),
-        String(row.priority ?? ''),
-        filters,
-      ),
-    )
+    const indexRows = incidentRows.map(row => ({
+      incident_id: String(row.incident_id ?? ''),
+      priority: String(row.priority ?? ''),
+      parent_id: String(row.parent_id ?? '').trim() || null,
+    }))
+    const matchedIds = matchedExportIncidentIds(indexRows, filters)
+    const selectedIds = expandExportIncidentIds(indexRows, filters)
+    const incidents = incidentRows.filter(row => selectedIds.has(String(row.incident_id ?? '')))
 
     if (format === 'csv') {
       const locationMap = byId(locations)
@@ -128,11 +131,8 @@ export function useAdminIncidentExport() {
     }
 
     const incidentIds = incidents.map(row => String(row.incident_id ?? '')).filter(Boolean)
-    const parentIds = incidents
-      .map(row => String(row.parent_id ?? '').trim())
-      .filter(Boolean)
 
-    const [updates, statusUpdates, whatsappActions, childRows] = await Promise.all([
+    const [updates, statusUpdates, whatsappActions] = await Promise.all([
       fetchInChunks(incidentIds, chunk =>
         fetchPaged(() =>
           supabase
@@ -159,31 +159,8 @@ export function useAdminIncidentExport() {
             .in('incident_id', chunk) as unknown as PagedQuery,
         ),
       ),
-      fetchInChunks(incidentIds, chunk =>
-        fetchPaged(() =>
-          supabase
-            .from('incidents')
-            .select('*')
-            .in('parent_id', chunk) as unknown as PagedQuery,
-        ),
-      ),
     ])
 
-    const relatedIds = [
-      ...parentIds,
-      ...childRows.map(row => String(row.incident_id ?? '')),
-    ].filter(id => !incidentIds.includes(id))
-
-    const extraRelated = await fetchInChunks(relatedIds, chunk =>
-      fetchPaged(() =>
-        supabase
-          .from('incidents')
-          .select('*')
-          .in('incident_id', chunk) as unknown as PagedQuery,
-      ),
-    )
-
-    const relatedIncidents = [...incidents, ...childRows, ...extraRelated]
     const messageIds = whatsappActions
       .map(row => String(row.message_id ?? ''))
       .filter(Boolean)
@@ -213,8 +190,9 @@ export function useAdminIncidentExport() {
 
     const payload = buildIncidentExportJson({
       filters,
+      matchedIds,
       incidents,
-      relatedIncidents,
+      relatedIncidents: incidentRows,
       locations,
       incidentTypes,
       helpOptions,

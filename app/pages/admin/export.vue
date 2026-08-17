@@ -2,9 +2,11 @@
 import { PRIORITIES } from '~/constants/incident'
 import type { Priority } from '~/types/models'
 import {
-  matchesIncidentExportFilters,
+  expandExportIncidentIds,
+  matchedExportIncidentIds,
   parseIncidentNumberInput,
   type IncidentExportFilters,
+  type IncidentExportIndexRow,
 } from '~/utils/incidentExport'
 
 useHead({ title: 'Export — Admin — IC2026 DV' })
@@ -16,7 +18,7 @@ const numberFromInput = ref('')
 const numberToInput = ref('')
 const priorities = ref<Priority[]>([])
 
-const indexRows = ref<Array<{ incident_id: string, priority: Priority }>>([])
+const indexRows = ref<IncidentExportIndexRow[]>([])
 const loading = ref(true)
 const exporting = ref<'csv' | 'json' | null>(null)
 const error = ref<string | null>(null)
@@ -63,9 +65,15 @@ const matchCount = computed(() => {
   if (!current) {
     return 0
   }
-  return indexRows.value.filter(row =>
-    matchesIncidentExportFilters(row.incident_id, row.priority, current),
-  ).length
+  return expandExportIncidentIds(indexRows.value, current).size
+})
+
+const addedSubCount = computed(() => {
+  const current = filters.value
+  if (!current) {
+    return 0
+  }
+  return matchCount.value - matchedExportIncidentIds(indexRows.value, current).size
 })
 
 async function load() {
@@ -135,9 +143,9 @@ async function onExport(format: 'csv' | 'json') {
         />
       </div>
       <p class="text-sm text-slate-600">
-        CSV bevat een platte incidenttabel. JSON bevat dezelfde incidenten plus alle
-        gerelateerde tabellen (locaties, types, hulpopties, updates, statushistorie,
-        WhatsApp) voor AI-input en analyse.
+        CSV bevat een platte incidenttabel (huidige locatie). JSON bevat dezelfde
+        incidenten plus gerelateerde tabellen, inclusief locatiehistorie uit updates
+        en volledige sub-incidenten van geselecteerde parents.
       </p>
     </section>
 
@@ -208,7 +216,10 @@ async function onExport(format: 'csv' | 'json') {
         <template v-else>
           {{ matchCount }}
           {{ matchCount === 1 ? 'incident' : 'incidenten' }} in deze selectie
-          van {{ indexRows.length }} totaal.
+          van {{ indexRows.length }} totaal
+          <template v-if="addedSubCount">
+            (inclusief {{ addedSubCount }} extra sub-incident{{ addedSubCount === 1 ? '' : 'en' }})
+          </template>.
         </template>
       </p>
 
