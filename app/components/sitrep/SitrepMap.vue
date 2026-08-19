@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import rasterMap from '~/assets/images/raster-map.png'
-import { getSectorMarkerPosition } from '~/constants/rasterMapGrid'
+import { buildRasterMapCells, getSectorMarkerPosition } from '~/constants/rasterMapGrid'
 import type { Incident } from '~/types/models'
 import { getIncidentSeverity, severityDotClass, severityMarkerClass, type SitrepSeverity } from '~/utils/sitrepColors'
+import {
+  drawIncidentHeatmap,
+  getHeatmapTiers,
+  heatmapTierLabel,
+  heatmapTierLegendColor,
+  HEATMAP_DEFAULT_TOP_THRESHOLD,
+  HEATMAP_TOP_THRESHOLD_MAX,
+  HEATMAP_TOP_THRESHOLD_MIN,
+  parseMapPercent,
+  type HeatmapPoint,
+} from '~/utils/sitrepHeatmap'
 
 const props = defineProps<{
   incidents: Incident[]
@@ -15,8 +26,12 @@ const hoveredSector = ref<string | null>(null)
 const activePickerSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
+const heatmapCanvasRef = ref<HTMLCanvasElement | null>(null)
 const sectionRef = ref<HTMLElement | null>(null)
 const markerEls = new Map<string, HTMLElement>()
+const showHeatmap = ref(false)
+const heatmapTopThreshold = ref(HEATMAP_DEFAULT_TOP_THRESHOLD)
+const heatmapPopoverRef = ref<{ hide: () => void, show: (event: Event) => void, toggle: (event: Event) => void } | null>(null)
 
 const pinchZoom = usePinchZoom({ maxScale: 2.5 })
 const {
@@ -31,7 +46,7 @@ const {
   onPointerUp,
 } = pinchZoom
 
-const { fitScale, resetMapView, stageSizeStyle } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
+const { fitScale, contentSize, resetMapView, stageSizeStyle } = useSitrepMapFit(viewportRef, imageRef, pinchZoom)
 
 const markerLayerStyle = computed(() => ({
   '--map-scale': scale.value,
@@ -103,6 +118,90 @@ const markers = computed(() => {
 const incidentCountOnMap = computed(() =>
   markers.value.reduce((total, marker) => total + marker.count, 0),
 )
+
+const heatmapPoints = computed<HeatmapPoint[]>(() => {
+  const countsBySector = new Map(markers.value.map(marker => [marker.sector, marker.count]))
+
+  return buildRasterMapCells().flatMap((cell) => {
+    const position = getSectorMarkerPosition(cell.code)
+    if (!position) {
+      return []
+    }
+
+    return [{
+      x: parseMapPercent(position.left),
+      y: parseMapPercent(position.top),
+      weight: countsBySector.get(cell.code) ?? 0,
+    }]
+  })
+})
+
+const heatmapTiers = computed(() => getHeatmapTiers(heatmapTopThreshold.value))
+
+function syncHeatmapCanvasSize() {
+  const canvas = heatmapCanvasRef.value
+  const size = contentSize.value
+  if (!canvas || !size) {
+    return false
+  }
+
+  if (canvas.width !== size.width || canvas.height !== size.height) {
+    canvas.width = size.width
+    canvas.height = size.height
+  }
+
+  return true
+}
+
+function renderHeatmap() {
+  if (!import.meta.client || !showHeatmap.value) {
+    return
+  }
+
+  const canvas = heatmapCanvasRef.value
+  if (!canvas || !syncHeatmapCanvasSize()) {
+    return
+  }
+
+  drawIncidentHeatmap(canvas, heatmapPoints.value, heatmapTopThreshold.value)
+}
+
+function clearHeatmap() {
+  const canvas = heatmapCanvasRef.value
+  const ctx = canvas?.getContext('2d')
+  if (!canvas || !ctx) {
+    return
+  }
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+}
+
+watch(showHeatmap, (visible) => {
+  if (visible) {
+    nextTick(renderHeatmap)
+    return
+  }
+  clearHeatmap()
+  heatmapPopoverRef.value?.hide()
+})
+
+function onHeatmapClick(event: Event) {
+  if (!showHeatmap.value) {
+    showHeatmap.value = true
+    nextTick(() => heatmapPopoverRef.value?.show(event))
+    return
+  }
+  heatmapPopoverRef.value?.toggle(event)
+}
+
+function disableHeatmap() {
+  showHeatmap.value = false
+}
+
+watch([heatmapPoints, contentSize, heatmapTopThreshold], () => {
+  if (showHeatmap.value) {
+    nextTick(renderHeatmap)
+  }
+})
 
 const listHoveredIncident = computed(() => {
   const id = hoveredIncidentId.value
@@ -296,7 +395,57 @@ function onPickerSelect(incident: Incident) {
           <span class="ic-sitrep-legend-item ic-sitrep-map__count">
             {{ incidentCountOnMap }} op kaart
           </span>
+          <button
+            type="button"
+            class="ic-sitrep-map__layer-toggle ic-sitrep-legend-item"
+            :class="{ 'ic-sitrep-map__layer-toggle--active': showHeatmap }"
+            :aria-pressed="showHeatmap"
+            :aria-expanded="showHeatmap"
+            @click="onHeatmapClick"
+          >
+            <i class="pi pi-chart-scatter" aria-hidden="true" />
+            Heatmap
+          </button>
         </div>
+        <Popover ref="heatmapPopoverRef" class="ic-sitrep-map__heatmap-popover-panel">
+          <div class="ic-sitrep-map__heatmap-popover">
+            <label class="ic-sitrep-map__heatmap-scale">
+              <span class="ic-sitrep-map__heatmap-scale-label">
+                Max drempel: {{ heatmapTopThreshold }}+ incidenten
+              </span>
+              <input
+                v-model.number="heatmapTopThreshold"
+                class="ic-sitrep-map__heatmap-slider"
+                type="range"
+                :min="HEATMAP_TOP_THRESHOLD_MIN"
+                :max="HEATMAP_TOP_THRESHOLD_MAX"
+                step="1"
+                aria-label="Heatmap drempel schalen"
+              >
+            </label>
+            <div class="ic-sitrep-map__heatmap-popover-legend">
+              <span
+                v-for="tier in heatmapTiers"
+                :key="tier.minCount"
+                class="ic-sitrep-legend-item ic-sitrep-map__heatmap-tier"
+              >
+                <span
+                  class="ic-sitrep-map__heatmap-swatch"
+                  :style="{ backgroundColor: heatmapTierLegendColor(tier) }"
+                  aria-hidden="true"
+                />
+                {{ heatmapTierLabel(tier) }}
+              </span>
+            </div>
+            <button
+              type="button"
+              class="ic-sitrep-map__heatmap-disable"
+              @click="disableHeatmap"
+            >
+              Heatmap uit
+            </button>
+          </div>
+        </Popover>
       </div>
     </header>
 
@@ -324,6 +473,12 @@ function onPickerSelect(incident: Incident) {
             decoding="async"
             draggable="false"
           >
+          <canvas
+            v-show="showHeatmap"
+            ref="heatmapCanvasRef"
+            class="ic-sitrep-map__heatmap"
+            aria-hidden="true"
+          />
           <div class="ic-sitrep-map__markers" :style="markerLayerStyle">
             <button
               v-for="{ sector, position, incidents, count, severity, highlightedIncident } in markers"
@@ -498,6 +653,123 @@ function onPickerSelect(incident: Incident) {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.375rem;
+  margin-left: auto;
+}
+
+.ic-sitrep-map__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.ic-sitrep-map__legend .ic-sitrep-map__layer-toggle {
+  margin-left: 0.125rem;
+  padding: 0 0 0 0.625rem;
+  border: none;
+  border-left: 1px solid rgb(135 161 198 / 0.45);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ic-brand);
+}
+
+.ic-sitrep-map__legend .ic-sitrep-map__layer-toggle:hover,
+.ic-sitrep-map__legend .ic-sitrep-map__layer-toggle:focus-visible {
+  background: transparent;
+  color: var(--ic-brand-dark);
+  outline: none;
+}
+
+.ic-sitrep-map__legend .ic-sitrep-map__layer-toggle--active {
+  border-color: rgb(135 161 198 / 0.45);
+  background: transparent;
+  color: rgb(153 27 27);
+}
+
+.ic-sitrep-map__layer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgb(135 161 198 / 0.55);
+  border-radius: 0.375rem;
+  background: #fff;
+  color: var(--ic-brand);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ic-sitrep-map__layer-toggle:hover,
+.ic-sitrep-map__layer-toggle:focus-visible {
+  background: rgb(135 161 198 / 0.12);
+  outline: none;
+}
+
+.ic-sitrep-map__layer-toggle--active {
+  border-color: rgb(215 48 39 / 0.55);
+  background: rgb(215 48 39 / 0.1);
+  color: rgb(153 27 27);
+}
+
+.ic-sitrep-map__heatmap-popover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem 1rem;
+  min-width: min(100%, 20rem);
+  padding: 0.125rem;
+}
+
+.ic-sitrep-map__heatmap-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 1 1 9rem;
+  min-width: 8.5rem;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.ic-sitrep-map__heatmap-popover-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.ic-sitrep-map__heatmap-disable {
+  flex: 1 0 100%;
+  padding: 0.25rem 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ic-sitrep-map__heatmap-disable:hover,
+.ic-sitrep-map__heatmap-disable:focus-visible {
+  color: rgb(153 27 27);
+  outline: none;
+}
+
+.ic-sitrep-map__heatmap-scale-label {
+  font-weight: 600;
+  color: var(--ic-brand-dark);
+}
+
+.ic-sitrep-map__heatmap-slider {
+  width: 100%;
+  accent-color: rgb(139 0 0);
+  cursor: pointer;
 }
 
 .ic-sitrep-map__title {
@@ -530,13 +802,17 @@ function onPickerSelect(incident: Incident) {
   background: rgb(135 161 198 / 0.12);
 }
 
-.ic-sitrep-map__legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.625rem;
-  font-size: 0.6875rem;
-  color: #64748b;
+.ic-sitrep-map__heatmap-tier {
+  gap: 0.3125rem;
+}
+
+.ic-sitrep-map__heatmap-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(15 23 42 / 0.18);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.5);
 }
 
 .ic-sitrep-map__frame {
@@ -594,6 +870,15 @@ function onPickerSelect(incident: Incident) {
   max-width: none;
   pointer-events: none;
   opacity: 0.7;
+}
+
+.ic-sitrep-map__heatmap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .ic-sitrep-map__markers {
