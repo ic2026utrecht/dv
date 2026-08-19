@@ -14,6 +14,7 @@ import {
   parseMapPercent,
   type HeatmapPoint,
 } from '~/utils/sitrepHeatmap'
+import { SITREP_MAP_LEGEND_SEVERITIES } from '~/composables/useSitrepMapPrefs'
 
 const props = defineProps<{
   incidents: Incident[]
@@ -22,6 +23,7 @@ const props = defineProps<{
 const { filterIncidents } = useSitrepQuery()
 const { openEditIncident } = useSitrepEditIncident()
 const { hoveredIncidentId } = useSitrepMapHighlight()
+const { isSeverityVisible, setSeverityVisible } = useSitrepMapPrefs()
 const hoveredSector = ref<string | null>(null)
 const activePickerSector = ref<string | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
@@ -115,8 +117,12 @@ const markers = computed(() => {
   })
 })
 
+const visibleMarkers = computed(() =>
+  markers.value.filter(marker => isSeverityVisible(marker.severity)),
+)
+
 const incidentCountOnMap = computed(() =>
-  markers.value.reduce((total, marker) => total + marker.count, 0),
+  visibleMarkers.value.reduce((total, marker) => total + marker.count, 0),
 )
 
 const heatmapPoints = computed<HeatmapPoint[]>(() => {
@@ -241,7 +247,7 @@ const overlayMarker = computed(() => {
   if (!sector) {
     return null
   }
-  return markers.value.find(marker => marker.sector === sector) ?? null
+  return visibleMarkers.value.find(marker => marker.sector === sector) ?? null
 })
 
 const overlayMode = computed<'picker' | 'hover' | 'highlight' | null>(() => {
@@ -380,18 +386,21 @@ function onPickerSelect(incident: Incident) {
           Reset
         </button>
         <div class="ic-sitrep-map__legend">
-          <span class="ic-sitrep-legend-item">
-            <span class="ic-sitrep-dot ic-sitrep-dot--critical" /> Critical
-          </span>
-          <span class="ic-sitrep-legend-item">
-            <span class="ic-sitrep-dot ic-sitrep-dot--high" /> Hoog
-          </span>
-          <span class="ic-sitrep-legend-item">
-            <span class="ic-sitrep-dot ic-sitrep-dot--warning" /> Middel
-          </span>
-          <span class="ic-sitrep-legend-item">
-            <span class="ic-sitrep-dot ic-sitrep-dot--ok" /> Laag
-          </span>
+          <label
+            v-for="{ id, label } in SITREP_MAP_LEGEND_SEVERITIES"
+            :key="id"
+            class="ic-sitrep-legend-item ic-sitrep-map__severity-toggle"
+            :class="{ 'ic-sitrep-map__severity-toggle--hidden': !isSeverityVisible(id) }"
+          >
+            <input
+              type="checkbox"
+              class="ic-sitrep-map__severity-checkbox"
+              :checked="isSeverityVisible(id)"
+              @change="setSeverityVisible(id, ($event.target as HTMLInputElement).checked)"
+            >
+            <span :class="severityDotClass(id)" aria-hidden="true" />
+            {{ label }}
+          </label>
           <span class="ic-sitrep-legend-item ic-sitrep-map__count">
             {{ incidentCountOnMap }} op kaart
           </span>
@@ -481,7 +490,7 @@ function onPickerSelect(incident: Incident) {
           />
           <div class="ic-sitrep-map__markers" :style="markerLayerStyle">
             <button
-              v-for="{ sector, position, incidents, count, severity, highlightedIncident } in markers"
+              v-for="{ sector, position, incidents, count, severity, highlightedIncident } in visibleMarkers"
               :key="sector"
               :ref="el => setMarkerRef(sector, el)"
               type="button"
@@ -664,6 +673,23 @@ function onPickerSelect(incident: Incident) {
   gap: 0.625rem;
   font-size: 0.6875rem;
   color: #64748b;
+}
+
+.ic-sitrep-map__severity-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.ic-sitrep-map__severity-toggle--hidden {
+  opacity: 0.45;
+}
+
+.ic-sitrep-map__severity-checkbox {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0;
+  accent-color: var(--ic-brand);
+  cursor: pointer;
 }
 
 .ic-sitrep-map__legend .ic-sitrep-map__layer-toggle {
